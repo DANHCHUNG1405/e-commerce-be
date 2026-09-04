@@ -19,4 +19,14 @@ Backend REST API viết bằng Go, Gin, GORM, PostgreSQL và MongoDB.
 - `internal/http`: router, middleware và handlers
 - `internal/models`: các entity của thương mại điện tử
 
-Các endpoint nghiệp vụ (auth, catalog, cart, order) sẽ được thêm trong `internal/http` và service/repository tương ứng.
+### Authentication API
+
+- `POST /api/v1/auth/register` — `{ "email", "password", "fullName" }`
+- `POST /api/v1/auth/login` — `{ "email", "password" }`
+- `POST /api/v1/auth/refresh` — `{ "refreshToken" }`
+- `POST /api/v1/auth/logout` — `{ "refreshToken" }`
+- `GET /api/v1/auth/me` — header `Authorization: Bearer <accessToken>`
+
+Access token có thời hạn 15 phút. Refresh token có thời hạn 30 ngày, được hash trong PostgreSQL và bị thu hồi khi logout hoặc refresh.
+
+PostgreSQL là nguồn dữ liệu nghiệp vụ duy nhất. MongoDB chỉ dành cho document linh hoạt như `product_metadata`; `outbox_events` vẫn được giữ trong PostgreSQL và sẽ được consumer riêng chuyển tới ClickHouse khi module analytics được triển khai.

@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/config"
 	"github.com/example/e-commerce-be/internal/database"
 	httpserver "github.com/example/e-commerce-be/internal/http"
-	"github.com/example/e-commerce-be/internal/outbox"
 )
 
 func main() {
@@ -40,13 +40,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
-	workerCtx, stopWorker := context.WithCancel(context.Background())
-	defer stopWorker()
-	go outbox.NewWorker(db, mongoClient, cfg.MongoDatabase).Run(workerCtx)
-
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpserver.NewRouter(db),
+		Handler:           httpserver.NewRouter(db, coreauth.NewTokenService(cfg.JWTSecret)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

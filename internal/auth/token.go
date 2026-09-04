@@ -1,14 +1,15 @@
 package auth
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type Claims struct {
 	Role string `json:"role"`
+	Type string `json:"type"`
 	jwt.RegisteredClaims
 }
 
@@ -20,15 +21,21 @@ func NewTokenService(secret string) TokenService {
 	return TokenService{secret: []byte(secret)}
 }
 
-func (s TokenService) Generate(userID uint, role string, expiresIn time.Duration) (string, error) {
+func (s TokenService) Generate(userID uuid.UUID, role string, expiresIn time.Duration) (string, error) {
 	claims := Claims{
 		Role: role,
+		Type: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   strconv.FormatUint(uint64(userID), 10),
+			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+}
+
+func (s TokenService) GenerateRefresh(userID uuid.UUID, role string, expiresIn time.Duration) (string, error) {
+	claims := Claims{Role: role, Type: "refresh", RegisteredClaims: jwt.RegisteredClaims{Subject: userID.String(), ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)), IssuedAt: jwt.NewNumericDate(time.Now())}}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
 }
 
