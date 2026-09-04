@@ -1,6 +1,6 @@
 # E-commerce Backend
 
-Backend REST API viết bằng Go, Gin, GORM và PostgreSQL.
+Backend REST API viết bằng Go, Gin, GORM, PostgreSQL và MongoDB.
 
 ## Khởi chạy nhanh
 
@@ -8,7 +8,7 @@ Backend REST API viết bằng Go, Gin, GORM và PostgreSQL.
 2. Chạy PostgreSQL và API bằng `docker compose up --build`.
 3. Kiểm tra API tại `http://localhost:8080/health` và trạng thái database tại `http://localhost:8080/ready`.
 
-Để chạy không dùng Docker, cần một PostgreSQL đang chạy và `DATABASE_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`.
+Để chạy không dùng Docker, cần PostgreSQL và MongoDB đang chạy (hoặc dùng các URI cloud), đặt `DATABASE_URL` và `MONGO_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`.
 
 ## Cấu trúc
 

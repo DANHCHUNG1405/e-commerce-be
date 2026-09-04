@@ -8,23 +8,30 @@ import (
 )
 
 type Config struct {
-	Environment string
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
+	Environment   string
+	Port          string
+	DatabaseURL   string
+	MongoURL      string
+	MongoDatabase string
+	JWTSecret     string
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
-		Environment: valueOrDefault("APP_ENV", "development"),
-		Port:        valueOrDefault("PORT", "8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		Environment:   valueOrDefault("APP_ENV", "development"),
+		Port:          valueOrDefault("PORT", "8080"),
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		MongoURL:      os.Getenv("MONGO_URL"),
+		MongoDatabase: valueOrDefault("MONGO_DATABASE", "ecommerce"),
+		JWTSecret:     os.Getenv("JWT_SECRET"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+	if cfg.MongoURL == "" {
+		return Config{}, errors.New("MONGO_URL is required")
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, errors.New("JWT_SECRET is required")

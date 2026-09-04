@@ -13,6 +13,7 @@ import (
 	"github.com/example/e-commerce-be/internal/config"
 	"github.com/example/e-commerce-be/internal/database"
 	httpserver "github.com/example/e-commerce-be/internal/http"
+	"github.com/example/e-commerce-be/internal/outbox"
 )
 
 func main() {
@@ -32,6 +33,16 @@ func main() {
 		slog.Error("database migration failed", "error", err)
 		os.Exit(1)
 	}
+
+	mongoClient, err := database.ConnectMongo(context.Background(), cfg.MongoURL)
+	if err != nil {
+		slog.Error("mongo connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	defer stopWorker()
+	go outbox.NewWorker(db, mongoClient, cfg.MongoDatabase).Run(workerCtx)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
