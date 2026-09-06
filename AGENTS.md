@@ -9,6 +9,7 @@ Tệp này là quy ước bắt buộc cho mọi thay đổi do Codex hoặc dev
 - Không tự ý đổi module path trong `go.mod`.
 - Không thêm dependency nếu có thể giải quyết bằng standard library hoặc dependency hiện có.
 - Không commit file `.env`, credential, token, private key hoặc dữ liệu production.
+- `.env.example` chỉ chứa cấu hình mẫu không nhạy cảm; URL kết nối, secret và thông tin tài khoản phải để trống hoặc dùng placeholder rõ ràng. Không sao chép giá trị từ `.env` sang file mẫu. Khi kiểm tra secret, chỉ báo tên biến/vị trí, không in giá trị hoặc diff chứa secret.
 - Không ghi secret vào log, error response, test output hoặc tài liệu.
 - Không chạy thao tác phá huỷ dữ liệu nếu chưa được yêu cầu rõ ràng.
 
