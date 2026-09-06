@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -20,8 +22,9 @@ var (
 )
 
 type Service struct {
-	db     *gorm.DB
-	tokens coreauth.TokenService
+	db            *gorm.DB
+	tokens        coreauth.TokenService
+	refreshTokens *refreshTokenStore
 }
 type RegisterInput struct {
 	Email    string
@@ -34,11 +37,11 @@ type TokenPair struct {
 	ExpiresIn    int64  `json:"expiresIn"`
 }
 
-func NewService(db *gorm.DB, tokens coreauth.TokenService) *Service {
-	return &Service{db: db, tokens: tokens}
+func NewService(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client) *Service {
+	return &Service{db: db, tokens: tokens, refreshTokens: newRefreshTokenStore(redisClient)}
 }
 
-func (s *Service) Register(input RegisterInput) (*models.User, TokenPair, error) {
+func (s *Service) Register(ctx context.Context, input RegisterInput) (*models.User, TokenPair, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if email == "" || len(input.Password) < 8 {
 		return nil, TokenPair{}, ErrInvalidCredentials
@@ -48,7 +51,7 @@ func (s *Service) Register(input RegisterInput) (*models.User, TokenPair, error)
 		return nil, TokenPair{}, err
 	}
 	user := &models.User{Email: email, Password: hash, FullName: strings.TrimSpace(input.FullName)}
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("email = ?", email).First(&models.User{}).Error; err == nil {
 			return ErrEmailExists
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -66,25 +69,26 @@ func (s *Service) Register(input RegisterInput) (*models.User, TokenPair, error)
 	if err != nil {
 		return nil, TokenPair{}, err
 	}
-	pair, err := s.issueTokens(user.ID, "customer")
+	pair, err := s.issueTokens(ctx, user.ID, "customer")
 	return user, pair, err
 }
 
-func (s *Service) Login(email, password string) (*models.User, TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*models.User, TokenPair, error) {
 	var user models.User
-	if err := s.db.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&user).Error; err != nil {
+	db := s.db.WithContext(ctx)
+	if err := db.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&user).Error; err != nil {
 		return nil, TokenPair{}, ErrInvalidCredentials
 	}
 	if coreauth.VerifyPassword(user.Password, password) != nil {
 		return nil, TokenPair{}, ErrInvalidCredentials
 	}
 	role := "customer"
-	_ = s.db.Table("roles").Select("roles.name").Joins("JOIN user_roles ON user_roles.role_id = roles.id").Where("user_roles.user_id = ?", user.ID).Scan(&role).Error
-	pair, err := s.issueTokens(user.ID, role)
+	_ = db.Table("roles").Select("roles.name").Joins("JOIN user_roles ON user_roles.role_id = roles.id").Where("user_roles.user_id = ?", user.ID).Scan(&role).Error
+	pair, err := s.issueTokens(ctx, user.ID, role)
 	return &user, pair, err
 }
 
-func (s *Service) Refresh(token string) (TokenPair, error) {
+func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) {
 	claims, err := s.tokens.Parse(token)
 	if err != nil || claims.Type != "refresh" {
 		return TokenPair{}, ErrInvalidToken
@@ -93,44 +97,43 @@ func (s *Service) Refresh(token string) (TokenPair, error) {
 	if err != nil {
 		return TokenPair{}, ErrInvalidToken
 	}
-	hash := hashToken(token)
-	var stored models.RefreshToken
-	if err := s.db.Where("user_id = ? AND token_hash = ? AND revoked_at IS NULL AND expires_at > ?", userID, hash, time.Now()).First(&stored).Error; err != nil {
+	consumed, err := s.refreshTokens.Consume(ctx, hashToken(token), userID)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if !consumed {
 		return TokenPair{}, ErrInvalidToken
 	}
-	now := time.Now()
-	result := s.db.Model(&models.RefreshToken{}).Where("id = ? AND revoked_at IS NULL", stored.ID).Updates(map[string]any{"revoked_at": now})
-	if result.Error != nil {
-		return TokenPair{}, result.Error
-	}
-	if result.RowsAffected != 1 {
-		return TokenPair{}, ErrInvalidToken
-	}
-	return s.issueTokens(userID, claims.Role)
+	return s.issueTokens(ctx, userID, claims.Role)
 }
 
-func (s *Service) Logout(token string) error {
+func (s *Service) Logout(ctx context.Context, token string) error {
 	claims, err := s.tokens.Parse(token)
 	if err != nil || claims.Type != "refresh" {
 		return ErrInvalidToken
 	}
-	userID, err := uuid.Parse(claims.Subject)
-	if err != nil {
+	if _, err := uuid.Parse(claims.Subject); err != nil {
 		return ErrInvalidToken
 	}
-	now := time.Now()
-	return s.db.Model(&models.RefreshToken{}).Where("user_id = ? AND token_hash = ? AND revoked_at IS NULL", userID, hashToken(token)).Updates(map[string]any{"revoked_at": now}).Error
+	deleted, err := s.refreshTokens.Delete(ctx, hashToken(token))
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrInvalidToken
+	}
+	return nil
 }
 
-func (s *Service) FindUser(id uuid.UUID) (*models.User, error) {
+func (s *Service) FindUser(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var user models.User
-	if err := s.db.First(&user, "id = ?", id).Error; err != nil {
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (s *Service) issueTokens(userID uuid.UUID, role string) (TokenPair, error) {
+func (s *Service) issueTokens(ctx context.Context, userID uuid.UUID, role string) (TokenPair, error) {
 	access, err := s.tokens.Generate(userID, role, 15*time.Minute)
 	if err != nil {
 		return TokenPair{}, err
@@ -139,7 +142,7 @@ func (s *Service) issueTokens(userID uuid.UUID, role string) (TokenPair, error) 
 	if err != nil {
 		return TokenPair{}, err
 	}
-	if err := s.db.Create(&models.RefreshToken{UserID: userID, TokenHash: hashToken(refresh), ExpiresAt: time.Now().Add(30 * 24 * time.Hour)}).Error; err != nil {
+	if err := s.refreshTokens.Store(ctx, hashToken(refresh), userID, 30*24*time.Hour); err != nil {
 		return TokenPair{}, err
 	}
 	return TokenPair{AccessToken: access, RefreshToken: refresh, ExpiresIn: 900}, nil

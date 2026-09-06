@@ -40,9 +40,23 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
+
+	redisCtx, cancelRedis := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelRedis()
+	redisClient, err := database.ConnectRedis(redisCtx, cfg.RedisURL)
+	if err != nil {
+		slog.Error("Redis connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = redisClient.Close() }()
+
+	tokens := coreauth.NewTokenService(cfg.JWTSecret)
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, mongoClient.Database(cfg.MongoDatabase))
+	closeChat := httpserver.AttachChat(router, db, tokens, redisClient, cfg.WebSocketOrigins)
+	defer closeChat()
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpserver.NewRouter(db, coreauth.NewTokenService(cfg.JWTSecret)),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -57,6 +71,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+	closeChat()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

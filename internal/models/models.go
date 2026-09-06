@@ -27,21 +27,17 @@ type UserRole struct {
 }
 type Seller struct {
 	Base
-	Name           string `gorm:"not null"`
-	Slug           string `gorm:"uniqueIndex;not null"`
-	CommissionRate int    `gorm:"not null;default:0"`
+	Description    string         `json:"description"`
+	PickupAddress  map[string]any `gorm:"serializer:json" json:"pickupAddress"`
+	Status         string         `gorm:"not null;default:pending"`
+	Name           string         `gorm:"not null"`
+	Slug           string         `gorm:"uniqueIndex;not null"`
+	CommissionRate int            `gorm:"not null;default:0"`
 }
 type SellerMember struct {
 	SellerID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	UserID   uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Role     string    `gorm:"not null"`
-}
-type RefreshToken struct {
-	Base
-	UserID    uuid.UUID `gorm:"type:uuid;index;not null"`
-	TokenHash string    `gorm:"uniqueIndex;not null"`
-	ExpiresAt time.Time `gorm:"not null"`
-	RevokedAt *time.Time
 }
 type Category struct {
 	Base
@@ -97,6 +93,10 @@ type CartItem struct {
 }
 type Order struct {
 	Base
+	CouponCode                             string
+	CheckoutSelection                      string         `json:"-"`
+	AddressSnapshot                        map[string]any `gorm:"serializer:json"`
+	IdempotencyKey                         string
 	UserID                                 uuid.UUID `gorm:"type:uuid;index;not null"`
 	Status                                 string    `gorm:"not null;default:pending"`
 	Currency                               string    `gorm:"not null;default:VND"`
@@ -105,6 +105,7 @@ type Order struct {
 }
 type SellerOrder struct {
 	Base
+	Discount                    int64
 	OrderID, SellerID           uuid.UUID `gorm:"type:uuid;index;not null"`
 	Status                      string    `gorm:"not null;default:pending"`
 	Subtotal, Commission, Total int64     `gorm:"not null;default:0"`
@@ -125,10 +126,13 @@ type ShippingAddress struct {
 }
 type Payment struct {
 	Base
-	OrderID uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
-	Method  string    `gorm:"not null"`
-	Status  string    `gorm:"not null;default:pending"`
-	Amount  int64     `gorm:"not null"`
+	Code          *string `gorm:"uniqueIndex"`
+	Bank          string
+	AccountNumber string
+	OrderID       uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
+	Method        string    `gorm:"not null"`
+	Status        string    `gorm:"not null;default:pending"`
+	Amount        int64     `gorm:"not null"`
 }
 type PaymentTransaction struct {
 	Base
@@ -136,20 +140,38 @@ type PaymentTransaction struct {
 	Provider, ProviderTransactionID, Status string    `gorm:"not null"`
 	Amount                                  int64     `gorm:"not null"`
 }
+
+type PaymentWebhookReceipt struct {
+	Base
+	Provider, ProviderTransactionID              string
+	PaymentID                                    *uuid.UUID `gorm:"type:uuid"`
+	Code, Bank, AccountNumber, Direction, Status string
+	Amount                                       int64
+}
 type Shipment struct {
 	Base
-	SellerOrderID           uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
+	DriverID                *uuid.UUID     `json:"driverId"`
+	AddressSnapshot         map[string]any `gorm:"serializer:json" json:"addressSnapshot"`
+	PickupSnapshot          map[string]any `gorm:"serializer:json" json:"pickupSnapshot"`
+	CODAmount               int64          `json:"codAmount"`
+	CODCollected            bool           `json:"codCollected"`
+	CODSettled              bool           `json:"codSettled"`
+	SellerOrderID           uuid.UUID      `gorm:"type:uuid;uniqueIndex;not null"`
 	Carrier, TrackingNumber string
 	Status                  string `gorm:"not null;default:pending"`
 }
 type ShipmentEvent struct {
 	Base
-	ShipmentID  uuid.UUID `gorm:"type:uuid;index;not null"`
-	Status      string    `gorm:"not null"`
+	ActorID     *uuid.UUID `json:"actorId"`
+	RequestID   *string    `json:"requestId"`
+	ShipmentID  uuid.UUID  `gorm:"type:uuid;index;not null"`
+	Status      string     `gorm:"not null"`
 	Description string
 }
 type Coupon struct {
 	Base
+	Active                bool
+	MaxDiscount           int64
 	Code                  string `gorm:"uniqueIndex;not null"`
 	Type                  string `gorm:"not null"`
 	Value                 int64  `gorm:"not null"`

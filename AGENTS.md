@@ -49,9 +49,11 @@ Tệp này là quy ước bắt buộc cho mọi thay đổi do Codex hoặc dev
 ## 5. API và bảo mật
 
 - Version API dưới `/api/v1`.
+- Mọi JSON response API dùng `internal/http/response`: `{statusCode, error, responseTimestamp, data: {msg, content}}`. HTTP status phải khớp statusCode; timestamp UTC có mili giây. Không có dữ liệu dùng content `{}`; logout trả 200. Không tự trả JSON ngoài helper này.
 - Password chỉ lưu bcrypt hash; tuyệt đối không trả password trong JSON.
 - JWT chỉ ký bằng secret từ environment; không hard-code secret.
 - Webhook payment phải kiểm tra chữ ký và idempotency bằng provider transaction ID.
+- Webhook SePay dùng `response.WebhookSuccess`: giữ envelope chung và bổ sung `success: true` ở top-level theo giao thức nhà cung cấp; các API frontend không thêm trường này. Không xác nhận thanh toán từ redirect hoặc dữ liệu frontend.
 - Luôn validate input, giới hạn pagination và kiểm tra quyền seller/admin ở service layer.
 - Error response không được chứa SQL, connection string hoặc stack trace production.
 
@@ -63,6 +65,8 @@ Tệp này là quy ước bắt buộc cho mọi thay đổi do Codex hoặc dev
 - Goroutine phải có lifecycle rõ ràng và dừng qua context khi shutdown.
 - Tên package viết thường, không dùng tên chung như `util` nếu có thể đặt theo domain.
 - Tránh global mutable state.
+- Mọi key Redis phải được tạo bằng `internal/rediskey.Key(...)`, dùng prefix cố định `ecommerce:` để phân biệt dự án trên Redis dùng chung. Không dùng key ngoài namespace này; không dùng `FLUSHDB`/`FLUSHALL` trên Redis dùng chung.
+- Chức năng realtime dùng WebSocket thuần tại `/api/v1/ws`, không dùng Socket.IO. JWT gửi trong frame auth đầu tiên, không đặt token trong URL. Event/ACK dùng envelope chung kèm event/requestId; kiểm tra quyền hội thoại ở service, không tin room/userId từ client. Mỗi connection chỉ có một data writer, hàng đợi hữu hạn, heartbeat và lifecycle theo context; frontend reconnect phải đồng bộ lịch sử theo sequence.
 
 ## 7. Kiểm tra bắt buộc
 
