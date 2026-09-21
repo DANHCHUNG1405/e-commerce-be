@@ -91,7 +91,7 @@ func (s *Service) Receive(ctx context.Context, w Webhook) error {
 					if err := tx.MarkPaid(&p); err != nil {
 						return err
 					}
-					if err := tx.Enqueue("payment", p.ID, "payment_succeeded", map[string]any{"orderId": o.ID, "amount": p.Amount, "providerTransactionId": rec.ProviderTransactionID}); err != nil {
+					if err := tx.Enqueue("payment", p.ID, "payment_succeeded", map[string]any{"orderId": o.ID, "userId": o.UserID, "amount": p.Amount, "providerTransactionId": rec.ProviderTransactionID}); err != nil {
 						return err
 					}
 				}

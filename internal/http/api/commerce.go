@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/review"
+	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/modules/wishlist"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,6 +23,23 @@ func Commerce(v *gin.RouterGroup, auth gin.HandlerFunc, orders *order.Service, r
 		Reply(c, 200, d, e)
 	})
 	a := v.Group("", auth)
+	a.GET("/admin/reviews", func(c *gin.Context) {
+		p, l, ok := Page(c)
+		if !ok {
+			return
+		}
+		var product *uuid.UUID
+		if raw, exists := c.GetQuery("productId"); exists {
+			id, err := uuid.Parse(raw)
+			if err != nil || id == uuid.Nil {
+				Reply(c, 400, nil, shared.ErrInvalid)
+				return
+			}
+			product = &id
+		}
+		d, e := reviews.AdminList(c.Request.Context(), User(c), c.Query("status"), product, p, l)
+		Reply(c, 200, d, e)
+	})
 	a.GET("/sellers/:seller/orders", func(c *gin.Context) {
 		id, ok := ID(c, "seller")
 		if !ok {

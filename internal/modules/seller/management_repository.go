@@ -11,10 +11,26 @@ import (
 
 type ManagementRepository struct{ db *gorm.DB }
 
+type AdminSeller struct {
+	models.Seller
+	OwnerID    *uuid.UUID `json:"ownerId,omitempty"`
+	OwnerEmail string     `json:"ownerEmail,omitempty"`
+}
+
 func (r *ManagementRepository) Profile(ctx context.Context, id uuid.UUID) (models.Seller, error) {
 	var s models.Seller
 	err := r.db.WithContext(ctx).First(&s, "id=? AND deleted_at IS NULL", id).Error
 	return s, err
+}
+
+func (r *ManagementRepository) AdminList(ctx context.Context, status string, p, l int) ([]AdminSeller, error) {
+	items := []AdminSeller{}
+	q := r.db.WithContext(ctx).Table("sellers s").Select("s.*, u.id AS owner_id, u.email AS owner_email").Joins("LEFT JOIN seller_members sm ON sm.seller_id=s.id AND sm.role='owner'").Joins("LEFT JOIN users u ON u.id=sm.user_id").Where("s.deleted_at IS NULL")
+	if status != "" {
+		q = q.Where("s.status=?", status)
+	}
+	err := q.Order("s.created_at DESC,s.id").Offset((p - 1) * l).Limit(l).Scan(&items).Error
+	return items, err
 }
 
 func NewManagementRepository(db *gorm.DB) *ManagementRepository { return &ManagementRepository{db} }
@@ -39,6 +55,10 @@ func (r *ManagementRepository) Role(ctx context.Context, u, id uuid.UUID, lock b
 }
 func (r *ManagementRepository) Update(ctx context.Context, id uuid.UUID, in ShopInput) error {
 	return r.db.WithContext(ctx).Model(&models.Seller{}).Where("id=?", id).Updates(map[string]any{"name": in.Name, "description": in.Description, "pickup_address": gorm.Expr("?::jsonb", in.pickupJSON())}).Error
+}
+
+func (r *ManagementRepository) Asset(ctx context.Context, id uuid.UUID, field, value string) error {
+	return r.db.WithContext(ctx).Model(&models.Seller{}).Where("id=? AND deleted_at IS NULL", id).Update(field, value).Error
 }
 func (r *ManagementRepository) Members(ctx context.Context, id uuid.UUID, p, l int) ([]models.SellerMember, error) {
 	v := []models.SellerMember{}
@@ -116,10 +136,14 @@ func (r *ManagementRepository) Orders(ctx context.Context, id uuid.UUID, status 
 }
 
 type Dashboard struct {
-	Products        int64 `json:"products"`
-	PendingOrders   int64 `json:"pendingOrders"`
-	DeliveredOrders int64 `json:"deliveredOrders"`
-	DeliveredSales  int64 `json:"deliveredSales"`
+	Products         int64 `json:"products"`
+	ActiveProducts   int64 `json:"activeProducts"`
+	TotalOrders      int64 `json:"totalOrders"`
+	PendingOrders    int64 `json:"pendingOrders"`
+	DeliveredOrders  int64 `json:"deliveredOrders"`
+	CancelledOrders  int64 `json:"cancelledOrders"`
+	LowStockVariants int64 `json:"lowStockVariants"`
+	DeliveredSales   int64 `json:"deliveredSales"`
 }
 
 func (r *ManagementRepository) Dashboard(ctx context.Context, id uuid.UUID) (Dashboard, error) {
@@ -128,13 +152,26 @@ func (r *ManagementRepository) Dashboard(ctx context.Context, id uuid.UUID) (Das
 	if err := q.Model(&models.Product{}).Where("seller_id=? AND deleted_at IS NULL", id).Count(&d.Products).Error; err != nil {
 		return d, err
 	}
+	if err := q.Model(&models.Product{}).Where("seller_id=? AND deleted_at IS NULL AND status='active'", id).Count(&d.ActiveProducts).Error; err != nil {
+		return d, err
+	}
+	if err := q.Model(&models.SellerOrder{}).Where("seller_id=? AND deleted_at IS NULL", id).Count(&d.TotalOrders).Error; err != nil {
+		return d, err
+	}
 	if err := q.Model(&models.SellerOrder{}).Where("seller_id=? AND status='pending'", id).Count(&d.PendingOrders).Error; err != nil {
 		return d, err
 	}
 	if err := q.Model(&models.SellerOrder{}).Where("seller_id=? AND status='delivered'", id).Count(&d.DeliveredOrders).Error; err != nil {
 		return d, err
 	}
-	err := q.Model(&models.SellerOrder{}).Select("COALESCE(SUM(total),0)").Where("seller_id=? AND status='delivered'", id).Scan(&d.DeliveredSales).Error
+	if err := q.Model(&models.SellerOrder{}).Where("seller_id=? AND status='cancelled'", id).Count(&d.CancelledOrders).Error; err != nil {
+		return d, err
+	}
+	err := q.Table("product_variants v").Joins("JOIN products p ON p.id=v.product_id").Where("p.seller_id=? AND p.deleted_at IS NULL AND v.stock <= 5", id).Count(&d.LowStockVariants).Error
+	if err != nil {
+		return d, err
+	}
+	err = q.Model(&models.SellerOrder{}).Select("COALESCE(SUM(total),0)").Where("seller_id=? AND status='delivered'", id).Scan(&d.DeliveredSales).Error
 	return d, err
 }
 func (r *ManagementRepository) Inventory(ctx context.Context, shop, variant uuid.UUID, p, l int) ([]models.InventoryMovement, error) {

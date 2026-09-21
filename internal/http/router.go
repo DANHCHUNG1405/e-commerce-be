@@ -8,9 +8,12 @@ import (
 	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/http/api"
 	"github.com/example/e-commerce-be/internal/http/middleware"
+	"github.com/example/e-commerce-be/internal/mailer"
+	adminmodule "github.com/example/e-commerce-be/internal/modules/admin"
 	authmodule "github.com/example/e-commerce-be/internal/modules/auth"
 	"github.com/example/e-commerce-be/internal/modules/cart"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
+	"github.com/example/e-commerce-be/internal/modules/notification"
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/payment"
 	"github.com/example/e-commerce-be/internal/modules/review"
@@ -27,10 +30,10 @@ import (
 )
 
 func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, metadataDB ...*mongo.Database) *gin.Engine {
-	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, metadataDB...)
+	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, nil, "", metadataDB...)
 }
 
-func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, metadataDB ...*mongo.Database) *gin.Engine {
+func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, emailSender mailer.Sender, passwordResetURL string, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -52,12 +55,18 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 
 	v1 := router.Group("/api/v1")
 	authService := authmodule.NewService(db, tokenService, redisClient)
+	if emailSender != nil {
+		authService.ConfigurePasswordReset(emailSender, passwordResetURL)
+	}
 	authHandler := authmodule.NewHandler(authService)
 	authRoutes := v1.Group("/auth")
 	authRoutes.POST("/register", authHandler.Register)
 	authRoutes.POST("/login", authHandler.Login)
 	authRoutes.POST("/refresh", authHandler.Refresh)
 	authRoutes.POST("/logout", authHandler.Logout)
+	authRoutes.POST("/change-password", middleware.RequireAccessToken(tokenService), authHandler.ChangePassword)
+	authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
+	authRoutes.POST("/reset-password", authHandler.ResetPassword)
 	authRoutes.GET("/me", middleware.RequireAccessToken(tokenService), authHandler.Me)
 	repo := shared.New(db)
 	api.DeliveryRoutes(v1, middleware.RequireAccessToken(tokenService), shipping.New(shipping.NewRepository(db)))
@@ -70,6 +79,8 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), seller.New(repo), user.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))
+	api.NotificationRoutes(v1, middleware.RequireAccessToken(tokenService), notification.New(db))
+	api.AdminRoutes(v1, middleware.RequireAccessToken(tokenService), adminmodule.New(db))
 
 	return router
 }

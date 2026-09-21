@@ -15,6 +15,27 @@ func (s *Service) List(ctx context.Context, product uuid.UUID, p, l int) ([]mode
 	err := s.repo.List(ctx, &v, "product_id=? AND status='published' AND deleted_at IS NULL", []any{product}, p, l)
 	return v, err
 }
+
+func (s *Service) AdminList(ctx context.Context, u uuid.UUID, status string, product *uuid.UUID, p, l int) ([]models.Review, error) {
+	if p < 1 || l < 1 || l > 100 || status != "" && status != "published" && status != "hidden" {
+		return nil, shared.ErrInvalid
+	}
+	if err := s.repo.Admin(ctx, u); err != nil {
+		return nil, err
+	}
+	where := "deleted_at IS NULL"
+	args := []any{}
+	if status != "" {
+		where += " AND status=?"
+		args = append(args, status)
+	}
+	if product != nil {
+		where += " AND product_id=?"
+		args = append(args, *product)
+	}
+	items := []models.Review{}
+	return items, s.repo.List(ctx, &items, where, args, p, l)
+}
 func (s *Service) Create(ctx context.Context, u, item uuid.UUID, rating int, comment string) (models.Review, error) {
 	v := models.Review{}
 	if rating < 1 || rating > 5 || len(comment) > 5000 {

@@ -175,7 +175,7 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 		if err := remove.Delete(&models.CartItem{}).Error; err != nil {
 			return err
 		}
-		return outbox.Enqueue(tx, "order", o.ID, "order_created", map[string]any{"orderId": o.ID, "total": o.Total, "discount": o.Discount, "currency": "VND"})
+		return outbox.Enqueue(tx, "order", o.ID, "order_created", map[string]any{"orderId": o.ID, "userId": o.UserID, "total": o.Total, "discount": o.Discount, "currency": "VND"})
 	})
 	return o, err
 }
@@ -247,6 +247,6 @@ func (r *Repository) Cancel(ctx context.Context, u, id uuid.UUID) error {
 		if err := tx.Model(&models.Payment{}).Where("order_id=?", id).Update("status", "cancelled").Error; err != nil {
 			return err
 		}
-		return outbox.Enqueue(tx, "order", id, "order_status_changed", map[string]any{"status": "cancelled"})
+		return outbox.Enqueue(tx, "order", id, "order_status_changed", map[string]any{"status": "cancelled", "userId": o.UserID})
 	})
 }

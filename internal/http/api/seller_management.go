@@ -6,6 +6,14 @@ import (
 )
 
 func SellerManagementRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.Management) {
+	v.GET("/admin/sellers", auth, func(c *gin.Context) {
+		p, l, ok := Page(c)
+		if !ok {
+			return
+		}
+		items, err := s.AdminList(c.Request.Context(), User(c), c.Query("status"), p, l)
+		Reply(c, 200, items, err)
+	})
 	a := v.Group("/sellers/:seller", auth)
 	a.GET("/profile", func(c *gin.Context) {
 		id, ok := ID(c, "seller")
@@ -26,6 +34,27 @@ func SellerManagementRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.
 		}
 		Reply(c, 200, nil, s.Update(c.Request.Context(), User(c), id, in))
 	})
+	for _, asset := range []string{"logo", "banner"} {
+		name := asset
+		a.POST("/"+name, func(c *gin.Context) {
+			var in seller.SellerAssetInput
+			if !Bind(c, &in) {
+				return
+			}
+			id, ok := ID(c, "seller")
+			if !ok {
+				return
+			}
+			Reply(c, 200, nil, s.SetAsset(c.Request.Context(), User(c), id, name+"_url", in.URL))
+		})
+		a.DELETE("/"+name, func(c *gin.Context) {
+			id, ok := ID(c, "seller")
+			if !ok {
+				return
+			}
+			Reply(c, 200, nil, s.SetAsset(c.Request.Context(), User(c), id, name+"_url", ""))
+		})
+	}
 	a.GET("/members", func(c *gin.Context) {
 		id, ok := ID(c, "seller")
 		if !ok {

@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/models"
+	"github.com/example/e-commerce-be/internal/rediskey"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -19,12 +22,19 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrEmailExists        = errors.New("email already exists")
 	ErrInvalidToken       = errors.New("invalid token")
+	ErrEmailUnavailable   = errors.New("email unavailable")
 )
 
 type Service struct {
 	db            *gorm.DB
 	tokens        coreauth.TokenService
 	refreshTokens *refreshTokenStore
+	emailSender   EmailSender
+	resetURL      string
+}
+
+type EmailSender interface {
+	SendPasswordReset(context.Context, string, string) error
 }
 type RegisterInput struct {
 	Email    string
@@ -39,6 +49,83 @@ type TokenPair struct {
 
 func NewService(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client) *Service {
 	return &Service{db: db, tokens: tokens, refreshTokens: newRefreshTokenStore(redisClient)}
+}
+
+func (s *Service) ConfigurePasswordReset(sender EmailSender, resetURL string) {
+	s.emailSender = sender
+	s.resetURL = strings.TrimRight(resetURL, "/")
+}
+
+func (s *Service) ChangePassword(ctx context.Context, u uuid.UUID, current, next string) error {
+	if len(next) < 8 || current == next {
+		return ErrInvalidCredentials
+	}
+	var user models.User
+	if err := s.db.WithContext(ctx).First(&user, "id=? AND deleted_at IS NULL", u).Error; err != nil {
+		return err
+	}
+	if coreauth.VerifyPassword(user.Password, current) != nil {
+		return ErrInvalidCredentials
+	}
+	hash, err := coreauth.HashPassword(next)
+	if err != nil {
+		return err
+	}
+	return s.db.WithContext(ctx).Model(&models.User{}).Where("id=?", u).Update("password", hash).Error
+}
+
+func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+	if s.emailSender == nil || s.resetURL == "" {
+		return ErrEmailUnavailable
+	}
+	var user models.User
+	if err := s.db.WithContext(ctx).Where("email=? AND deleted_at IS NULL", strings.ToLower(strings.TrimSpace(email))).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	if err := s.refreshTokens.client.Set(ctx, rediskey.Key("auth", "password-reset", hashToken(token)), user.ID.String(), 30*time.Minute).Err(); err != nil {
+		return err
+	}
+	if err := s.emailSender.SendPasswordReset(ctx, user.Email, s.resetURL+"?token="+token); err != nil {
+		return ErrEmailUnavailable
+	}
+	return nil
+}
+
+func (s *Service) ResetPassword(ctx context.Context, token, next string) error {
+	if token == "" || len(next) < 8 {
+		return ErrInvalidToken
+	}
+	value, err := s.refreshTokens.client.GetDel(ctx, rediskey.Key("auth", "password-reset", hashToken(token))).Result()
+	if err == redis.Nil {
+		return ErrInvalidToken
+	}
+	if err != nil {
+		return err
+	}
+	userID, err := uuid.Parse(value)
+	if err != nil {
+		return ErrInvalidToken
+	}
+	hash, err := coreauth.HashPassword(next)
+	if err != nil {
+		return err
+	}
+	result := s.db.WithContext(ctx).Model(&models.User{}).Where("id=? AND deleted_at IS NULL", userID).Update("password", hash)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInvalidToken
+	}
+	return nil
 }
 
 func (s *Service) Register(ctx context.Context, input RegisterInput) (*models.User, TokenPair, error) {

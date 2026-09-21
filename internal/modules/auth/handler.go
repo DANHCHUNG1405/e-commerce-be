@@ -109,3 +109,68 @@ func (h *Handler) Me(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, user)
 }
+
+func (h *Handler) ChangePassword(c *gin.Context) {
+	var input struct {
+		CurrentPassword string `json:"currentPassword" binding:"required"`
+		NewPassword     string `json:"newPassword" binding:"required,min=8"`
+	}
+	if c.ShouldBindJSON(&input) != nil {
+		response.Failure(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	id, err := uuid.Parse(c.GetString("user_id"))
+	if err != nil {
+		response.Failure(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	err = h.service.ChangePassword(c.Request.Context(), id, input.CurrentPassword, input.NewPassword)
+	if errors.Is(err, ErrInvalidCredentials) {
+		response.Failure(c, http.StatusBadRequest, "current password is invalid")
+		return
+	}
+	if err != nil {
+		response.Failure(c, http.StatusInternalServerError, "could not change password")
+		return
+	}
+	response.Success(c, http.StatusOK, nil)
+}
+
+func (h *Handler) ForgotPassword(c *gin.Context) {
+	var input struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if c.ShouldBindJSON(&input) != nil {
+		response.Failure(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if err := h.service.ForgotPassword(c.Request.Context(), input.Email); err != nil {
+		if errors.Is(err, ErrEmailUnavailable) {
+			response.Failure(c, http.StatusServiceUnavailable, "email service unavailable")
+			return
+		}
+		response.Failure(c, http.StatusInternalServerError, "could not process password reset")
+		return
+	}
+	response.Success(c, http.StatusOK, gin.H{"message": "if the email exists, a reset link has been sent"})
+}
+
+func (h *Handler) ResetPassword(c *gin.Context) {
+	var input struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"newPassword" binding:"required,min=8"`
+	}
+	if c.ShouldBindJSON(&input) != nil {
+		response.Failure(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if err := h.service.ResetPassword(c.Request.Context(), input.Token, input.NewPassword); err != nil {
+		if errors.Is(err, ErrInvalidToken) {
+			response.Failure(c, http.StatusBadRequest, "invalid or expired reset token")
+			return
+		}
+		response.Failure(c, http.StatusInternalServerError, "could not reset password")
+		return
+	}
+	response.Success(c, http.StatusOK, nil)
+}

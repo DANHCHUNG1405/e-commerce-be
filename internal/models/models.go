@@ -33,6 +33,8 @@ type Seller struct {
 	Name           string         `gorm:"not null"`
 	Slug           string         `gorm:"uniqueIndex;not null"`
 	CommissionRate int            `gorm:"not null;default:0"`
+	LogoURL        string         `gorm:"not null;default:''" json:"logoUrl"`
+	BannerURL      string         `gorm:"not null;default:''" json:"bannerUrl"`
 }
 type SellerMember struct {
 	SellerID uuid.UUID `gorm:"type:uuid;primaryKey"`

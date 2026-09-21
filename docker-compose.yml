@@ -7,6 +7,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  outbox-relay:
+    build:
+      context: .
+      args:
+        APP_BINARY: outbox-relay
+    env_file: .env
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+  notification:
+    build:
+      context: .
+      args:
+        APP_BINARY: notification
+    env_file: .env
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
   db:
     image: postgres:17-alpine
@@ -24,6 +50,35 @@ services:
       timeout: 5s
       retries: 10
 
+  kafka:
+    image: redpandadata/redpanda:v25.2.1
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://kafka:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    volumes:
+      - kafka_data:/var/lib/redpanda/data
+
+  kafka-ui:
+    image: redpandadata/console:latest
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_SCHEMAREGISTRY_ENABLED: "false"
+    ports:
+      - "8081:8080"
+    depends_on:
+      kafka:
+        condition: service_started
+
 volumes:
   postgres_data:
-
+  kafka_data:

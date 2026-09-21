@@ -13,6 +13,10 @@ import (
 
 type Management struct{ repo *ManagementRepository }
 
+type SellerAssetInput struct {
+	URL string `json:"url" binding:"required,max=2048"`
+}
+
 func (s *Management) Profile(ctx context.Context, u, id uuid.UUID) (models.Seller, error) {
 	if _, err := s.repo.Role(ctx, u, id, false); err != nil {
 		return models.Seller{}, err
@@ -133,6 +137,29 @@ func (s *Management) Dashboard(ctx context.Context, u, shop uuid.UUID) (Dashboar
 		return Dashboard{}, shared.ErrForbidden
 	}
 	return s.repo.Dashboard(ctx, shop)
+}
+
+func (s *Management) AdminList(ctx context.Context, u uuid.UUID, status string, p, l int) ([]AdminSeller, error) {
+	if !pages(p, l) || (status != "" && status != "pending" && status != "approved" && status != "rejected" && status != "suspended") {
+		return nil, shared.ErrInvalid
+	}
+	if err := shared.New(s.repo.db).Admin(ctx, u); err != nil {
+		return nil, err
+	}
+	return s.repo.AdminList(ctx, status, p, l)
+}
+
+func (s *Management) SetAsset(ctx context.Context, u, id uuid.UUID, field, rawURL string) error {
+	if _, err := s.repo.Role(ctx, u, id, false); err != nil {
+		return err
+	}
+	if field != "logo_url" && field != "banner_url" {
+		return shared.ErrInvalid
+	}
+	if len(rawURL) > 2048 || (rawURL != "" && !(strings.HasPrefix(rawURL, "https://") || strings.HasPrefix(rawURL, "http://"))) {
+		return shared.ErrInvalid
+	}
+	return s.repo.Asset(ctx, id, field, rawURL)
 }
 func (s *Management) Inventory(ctx context.Context, u, shop, variant uuid.UUID, p, l int) ([]models.InventoryMovement, error) {
 	if !pages(p, l) {

@@ -52,6 +52,14 @@ func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, sh
 		Reply(c, 200, data, err)
 	})
 	a := v.Group("", auth)
+	a.GET("/users/me/permissions", func(c *gin.Context) {
+		d, e := users.Permissions(c.Request.Context(), User(c))
+		Reply(c, 200, d, e)
+	})
+	a.GET("/users/me/seller-memberships", func(c *gin.Context) {
+		d, e := users.SellerMemberships(c.Request.Context(), User(c))
+		Reply(c, 200, d, e)
+	})
 	a.PATCH("/users/me", func(c *gin.Context) {
 		var in struct {
 			FullName string `json:"fullName" binding:"required,max=200"`

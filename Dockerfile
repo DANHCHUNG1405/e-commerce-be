@@ -4,12 +4,12 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api
+ARG APP_BINARY=api
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app-bin ./cmd/${APP_BINARY}
 
 FROM alpine:3.22
 RUN adduser -D -H appuser
 USER appuser
-COPY --from=build /api /api
+COPY --from=build /app-bin /app-bin
 EXPOSE 8080
-ENTRYPOINT ["/api"]
-
+ENTRYPOINT ["/app-bin"]

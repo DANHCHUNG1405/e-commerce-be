@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"github.com/example/e-commerce-be/internal/modules/payment"
 	"net/url"
 	"os"
@@ -20,20 +21,32 @@ type Config struct {
 	MongoDatabase    string
 	RedisURL         string
 	JWTSecret        string
+	SMTPHost         string
+	SMTPPort         int
+	SMTPUser         string
+	SMTPPassword     string
+	SMTPFrom         string
+	PasswordResetURL string
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
-		SePay:         payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
-		Environment:   valueOrDefault("APP_ENV", "development"),
-		Port:          valueOrDefault("PORT", "8080"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		MongoURL:      os.Getenv("MONGO_URL"),
-		MongoDatabase: valueOrDefault("MONGO_DATABASE", "ecommerce"),
-		RedisURL:      os.Getenv("REDIS_URL"),
-		JWTSecret:     os.Getenv("JWT_SECRET"),
+		SePay:            payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
+		Environment:      valueOrDefault("APP_ENV", "development"),
+		Port:             valueOrDefault("PORT", "8080"),
+		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		MongoURL:         os.Getenv("MONGO_URL"),
+		MongoDatabase:    valueOrDefault("MONGO_DATABASE", "ecommerce"),
+		RedisURL:         os.Getenv("REDIS_URL"),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
+		SMTPHost:         os.Getenv("SMTP_HOST"),
+		SMTPPort:         intValueOrDefault("SMTP_PORT", 587),
+		SMTPUser:         os.Getenv("SMTP_USER"),
+		SMTPPassword:     os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:         os.Getenv("SMTP_FROM"),
+		PasswordResetURL: os.Getenv("PASSWORD_RESET_URL"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -69,4 +82,16 @@ func valueOrDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func intValueOrDefault(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	var parsed int
+	if _, err := fmt.Sscanf(value, "%d", &parsed); err != nil || parsed < 1 || parsed > 65535 {
+		return fallback
+	}
+	return parsed
 }

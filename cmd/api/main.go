@@ -14,6 +14,7 @@ import (
 	"github.com/example/e-commerce-be/internal/config"
 	"github.com/example/e-commerce-be/internal/database"
 	httpserver "github.com/example/e-commerce-be/internal/http"
+	"github.com/example/e-commerce-be/internal/mailer"
 )
 
 func main() {
@@ -31,6 +32,10 @@ func main() {
 
 	if err := database.Migrate(db); err != nil {
 		slog.Error("database migration failed", "error", err)
+		os.Exit(1)
+	}
+	if err := database.MigrateNotifications(db); err != nil {
+		slog.Error("notification schema migration failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -51,7 +56,8 @@ func main() {
 	defer func() { _ = redisClient.Close() }()
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, mongoClient.Database(cfg.MongoDatabase))
+	emailSender := mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, emailSender, cfg.PasswordResetURL, mongoClient.Database(cfg.MongoDatabase))
 	closeChat := httpserver.AttachChat(router, db, tokens, redisClient, cfg.WebSocketOrigins)
 	defer closeChat()
 	server := &http.Server{
