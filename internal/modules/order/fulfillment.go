@@ -2,6 +2,7 @@ package order
 
 import (
 	"context"
+	"github.com/example/e-commerce-be/internal/events"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/outbox"
@@ -138,6 +139,6 @@ func (r *Repository) Fulfill(ctx context.Context, seller, id uuid.UUID, status, 
 		if err := tx.Model(&parent).Update("status", parentStatus).Error; err != nil {
 			return err
 		}
-		return outbox.Enqueue(tx, "seller_order", id, "order_status_changed", map[string]any{"status": status})
+		return outbox.Enqueue(tx, "seller_order", id, events.OrderStatusChanged, events.OrderStatusChangedPayload{OrderID: parent.ID, UserID: parent.UserID, Status: status, SellerOrderID: &id})
 	})
 }

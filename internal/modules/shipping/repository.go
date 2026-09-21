@@ -2,6 +2,7 @@ package shipping
 
 import (
 	"context"
+	"github.com/example/e-commerce-be/internal/events"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/outbox"
@@ -173,5 +174,5 @@ func (r *Repository) SettlePayment(ctx context.Context, o models.Order) error {
 	if result.RowsAffected == 0 {
 		return nil
 	}
-	return outbox.Enqueue(r.db.WithContext(ctx), "order", o.ID, "payment_succeeded", map[string]any{"method": "cod"})
+	return outbox.Enqueue(r.db.WithContext(ctx), "order", o.ID, events.PaymentSucceeded, events.PaymentSucceededPayload{OrderID: o.ID, UserID: o.UserID, Amount: o.Total, Method: "cod"})
 }

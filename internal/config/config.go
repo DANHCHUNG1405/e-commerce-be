@@ -12,41 +12,43 @@ import (
 )
 
 type Config struct {
-	WebSocketOrigins []string
-	SePay            payment.Config
-	Environment      string
-	Port             string
-	DatabaseURL      string
-	MongoURL         string
-	MongoDatabase    string
-	RedisURL         string
-	JWTSecret        string
-	SMTPHost         string
-	SMTPPort         int
-	SMTPUser         string
-	SMTPPassword     string
-	SMTPFrom         string
-	PasswordResetURL string
+	WebSocketOrigins       []string
+	SePay                  payment.Config
+	Environment            string
+	Port                   string
+	DatabaseURL            string
+	MongoURL               string
+	MongoDatabase          string
+	RedisURL               string
+	JWTSecret              string
+	SMTPHost               string
+	SMTPPort               int
+	SMTPUser               string
+	SMTPPassword           string
+	SMTPFrom               string
+	PasswordResetURL       string
+	NotificationServiceURL string
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
-		SePay:            payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
-		Environment:      valueOrDefault("APP_ENV", "development"),
-		Port:             valueOrDefault("PORT", "8080"),
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		MongoURL:         os.Getenv("MONGO_URL"),
-		MongoDatabase:    valueOrDefault("MONGO_DATABASE", "ecommerce"),
-		RedisURL:         os.Getenv("REDIS_URL"),
-		JWTSecret:        os.Getenv("JWT_SECRET"),
-		SMTPHost:         os.Getenv("SMTP_HOST"),
-		SMTPPort:         intValueOrDefault("SMTP_PORT", 587),
-		SMTPUser:         os.Getenv("SMTP_USER"),
-		SMTPPassword:     os.Getenv("SMTP_PASSWORD"),
-		SMTPFrom:         os.Getenv("SMTP_FROM"),
-		PasswordResetURL: os.Getenv("PASSWORD_RESET_URL"),
+		SePay:                  payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
+		Environment:            valueOrDefault("APP_ENV", "development"),
+		Port:                   valueOrDefault("PORT", "8080"),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		MongoURL:               os.Getenv("MONGO_URL"),
+		MongoDatabase:          valueOrDefault("MONGO_DATABASE", "ecommerce"),
+		RedisURL:               os.Getenv("REDIS_URL"),
+		JWTSecret:              os.Getenv("JWT_SECRET"),
+		SMTPHost:               os.Getenv("SMTP_HOST"),
+		SMTPPort:               intValueOrDefault("SMTP_PORT", 587),
+		SMTPUser:               os.Getenv("SMTP_USER"),
+		SMTPPassword:           os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:               os.Getenv("SMTP_FROM"),
+		PasswordResetURL:       os.Getenv("PASSWORD_RESET_URL"),
+		NotificationServiceURL: valueOrDefault("NOTIFICATION_SERVICE_URL", "http://notification:8082"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -73,6 +75,10 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, errors.New("JWT_SECRET is required")
+	}
+	notificationURL, err := url.Parse(cfg.NotificationServiceURL)
+	if err != nil || (notificationURL.Scheme != "http" && notificationURL.Scheme != "https") || notificationURL.Host == "" || notificationURL.User != nil || notificationURL.RawQuery != "" || notificationURL.Fragment != "" {
+		return Config{}, errors.New("NOTIFICATION_SERVICE_URL must be an absolute HTTP(S) URL")
 	}
 	return cfg, nil
 }

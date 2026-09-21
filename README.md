@@ -19,7 +19,7 @@ Backend REST API viết bằng Go, Gin, GORM, PostgreSQL và MongoDB.
 
 1. Sao chép `.env.example` thành `.env`.
 2. Chạy PostgreSQL và API bằng `docker compose up --build`.
-3. Kiểm tra API tại `http://localhost:8080/health` và trạng thái database tại `http://localhost:8080/ready`.
+3. Kiểm tra API tại `http://localhost:8080/health`, Notification Service tại `http://localhost:8082/health` và readiness tương ứng tại `/ready`.
 
 Để chạy không dùng Docker, cần PostgreSQL, MongoDB và Redis đang chạy (hoặc dùng các URI cloud), đặt `DATABASE_URL`, `MONGO_URL` và `REDIS_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`. Dùng scheme `rediss://` cho Redis TLS.
 

@@ -4,6 +4,8 @@ services:
     env_file: .env
     ports:
       - "8080:8080"
+    environment:
+      NOTIFICATION_SERVICE_URL: http://notification:8082
     depends_on:
       db:
         condition: service_healthy
@@ -28,11 +30,20 @@ services:
     env_file: .env
     environment:
       KAFKA_BROKERS: kafka:9092
+      KAFKA_NOTIFICATION_DLQ_TOPIC: ecommerce.notification.dlq.v1
+      NOTIFICATION_PORT: "8082"
+    ports:
+      - "8082:8082"
     depends_on:
       db:
         condition: service_healthy
       kafka:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8082/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   db:
     image: postgres:17-alpine

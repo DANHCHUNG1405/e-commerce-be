@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"encoding/json"
+	"github.com/example/e-commerce-be/internal/events"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/payment"
 	"github.com/example/e-commerce-be/internal/modules/shared"
@@ -175,7 +176,7 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 		if err := remove.Delete(&models.CartItem{}).Error; err != nil {
 			return err
 		}
-		return outbox.Enqueue(tx, "order", o.ID, "order_created", map[string]any{"orderId": o.ID, "userId": o.UserID, "total": o.Total, "discount": o.Discount, "currency": "VND"})
+		return outbox.Enqueue(tx, "order", o.ID, events.OrderCreated, events.OrderCreatedPayload{OrderID: o.ID, UserID: o.UserID, Total: o.Total, Discount: o.Discount, Currency: o.Currency})
 	})
 	return o, err
 }
@@ -247,6 +248,6 @@ func (r *Repository) Cancel(ctx context.Context, u, id uuid.UUID) error {
 		if err := tx.Model(&models.Payment{}).Where("order_id=?", id).Update("status", "cancelled").Error; err != nil {
 			return err
 		}
-		return outbox.Enqueue(tx, "order", id, "order_status_changed", map[string]any{"status": "cancelled", "userId": o.UserID})
+		return outbox.Enqueue(tx, "order", id, events.OrderStatusChanged, events.OrderStatusChangedPayload{OrderID: o.ID, UserID: o.UserID, Status: "cancelled"})
 	})
 }

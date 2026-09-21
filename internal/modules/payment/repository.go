@@ -69,6 +69,6 @@ func (r *Repository) RecordTransaction(v *models.PaymentTransaction) error {
 func (r *Repository) SaveReceipt(rec *models.PaymentWebhookReceipt) error {
 	return r.db.Model(rec).Updates(map[string]any{"status": rec.Status, "payment_id": rec.PaymentID}).Error
 }
-func (r *Repository) Enqueue(kind string, id uuid.UUID, event string, payload map[string]any) error {
+func (r *Repository) Enqueue(kind string, id uuid.UUID, event string, payload any) error {
 	return outbox.Enqueue(r.db, kind, id, event, payload)
 }

@@ -34,11 +34,6 @@ func main() {
 		slog.Error("database migration failed", "error", err)
 		os.Exit(1)
 	}
-	if err := database.MigrateNotifications(db); err != nil {
-		slog.Error("notification schema migration failed", "error", err)
-		os.Exit(1)
-	}
-
 	mongoClient, err := database.ConnectMongo(context.Background(), cfg.MongoURL)
 	if err != nil {
 		slog.Error("mongo connection failed", "error", err)
@@ -57,7 +52,7 @@ func main() {
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
 	emailSender := mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, emailSender, cfg.PasswordResetURL, mongoClient.Database(cfg.MongoDatabase))
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, emailSender, cfg.PasswordResetURL, cfg.NotificationServiceURL, mongoClient.Database(cfg.MongoDatabase))
 	closeChat := httpserver.AttachChat(router, db, tokens, redisClient, cfg.WebSocketOrigins)
 	defer closeChat()
 	server := &http.Server{

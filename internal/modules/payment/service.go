@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/example/e-commerce-be/internal/events"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
@@ -91,7 +92,7 @@ func (s *Service) Receive(ctx context.Context, w Webhook) error {
 					if err := tx.MarkPaid(&p); err != nil {
 						return err
 					}
-					if err := tx.Enqueue("payment", p.ID, "payment_succeeded", map[string]any{"orderId": o.ID, "userId": o.UserID, "amount": p.Amount, "providerTransactionId": rec.ProviderTransactionID}); err != nil {
+					if err := tx.Enqueue("payment", p.ID, events.PaymentSucceeded, events.PaymentSucceededPayload{OrderID: o.ID, UserID: o.UserID, Amount: p.Amount, Method: p.Method, ProviderTransactionID: rec.ProviderTransactionID}); err != nil {
 						return err
 					}
 				}

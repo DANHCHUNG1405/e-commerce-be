@@ -12,7 +12,7 @@ func NewWriter(brokers, topic string) *kafka.Writer {
 }
 
 func NewReader(brokers, topic, group string) *kafka.Reader {
-	return kafka.NewReader(kafka.ReaderConfig{Brokers: []string{brokers}, Topic: topic, GroupID: group, MinBytes: 1, MaxBytes: 10 << 20, CommitInterval: time.Second})
+	return kafka.NewReader(kafka.ReaderConfig{Brokers: []string{brokers}, Topic: topic, GroupID: group, MinBytes: 1, MaxBytes: 10 << 20, CommitInterval: 0})
 }
 
 func Wait(ctx context.Context, brokers string) error {
@@ -28,4 +28,12 @@ func Wait(ctx context.Context, brokers string) error {
 		case <-time.After(time.Second):
 		}
 	}
+}
+
+func Ping(ctx context.Context, brokers string) error {
+	conn, err := kafka.DialContext(ctx, "tcp", brokers)
+	if err != nil {
+		return err
+	}
+	return conn.Close()
 }
