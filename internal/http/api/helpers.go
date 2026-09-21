@@ -21,6 +21,9 @@ func Reply(c *gin.Context, status int, data any, err error) {
 	message := "internal server error"
 	var pg *pgconn.PgError
 	switch {
+	case errors.Is(err, shared.ErrUnauthorized):
+		code = 401
+		message = "unauthorized"
 	case errors.Is(err, shared.ErrRateLimited):
 		code = 429
 		message = "rate limit exceeded"

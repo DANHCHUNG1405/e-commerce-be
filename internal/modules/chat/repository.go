@@ -52,14 +52,8 @@ func (r *Repository) Open(ctx context.Context, buyer, seller uuid.UUID) (models.
 	return c, err
 }
 
-type Conversation struct {
-	models.ChatConversation
-	UnreadCount      int64 `json:"unreadCount"`
-	LastReadSequence int64 `json:"lastReadSequence"`
-}
-
-func (r *Repository) List(ctx context.Context, user uuid.UUID, page, limit int) ([]Conversation, error) {
-	v := []Conversation{}
+func (r *Repository) List(ctx context.Context, user uuid.UUID, page, limit int) ([]models.ChatConversationView, error) {
+	v := []models.ChatConversationView{}
 	err := r.db.WithContext(ctx).Table("chat_conversations c").Select("c.*, COALESCE(cr.last_sequence,0) AS last_read_sequence, (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.sequence>COALESCE(cr.last_sequence,0)) AS unread_count", user).Joins("LEFT JOIN chat_reads cr ON cr.conversation_id=c.id AND cr.user_id=?", user).Where("c.deleted_at IS NULL AND (c.buyer_id=? OR c.seller_id IN (SELECT sm.seller_id FROM seller_members sm JOIN sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", user, user).Order("c.updated_at DESC,c.id").Offset((page - 1) * limit).Limit(limit).Scan(&v).Error
 	return v, err
 }

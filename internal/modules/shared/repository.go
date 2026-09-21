@@ -8,6 +8,7 @@ import (
 )
 
 var ErrForbidden = errors.New("forbidden")
+var ErrUnauthorized = errors.New("unauthorized")
 var ErrInvalid = errors.New("invalid input")
 var ErrConflict = errors.New("conflict")
 var ErrUnavailable = errors.New("service unavailable")

@@ -6,8 +6,12 @@ services:
       - "8080:8080"
     environment:
       NOTIFICATION_SERVICE_URL: http://notification:8082
+      CHAT_SERVICE_URL: http://chat:8083
+      CHAT_GRPC_TARGET: chat:9091
     depends_on:
       db:
+        condition: service_healthy
+      chat:
         condition: service_healthy
   outbox-relay:
     build:
@@ -41,6 +45,28 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8082/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chat:
+    build:
+      context: .
+      args:
+        APP_BINARY: chat
+    env_file: .env
+    environment:
+      CHAT_HTTP_PORT: "8083"
+      CHAT_GRPC_PORT: "9091"
+    ports:
+      - "8083:8083"
+    expose:
+      - "9091"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8083/ready"]
       interval: 10s
       timeout: 5s
       retries: 10

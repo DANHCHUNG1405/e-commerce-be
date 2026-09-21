@@ -42,7 +42,7 @@ func (s *Service) Open(ctx context.Context, user, seller uuid.UUID) (models.Chat
 	}
 	return s.repo.Open(ctx, user, seller)
 }
-func (s *Service) List(ctx context.Context, user uuid.UUID, page, limit int) ([]Conversation, error) {
+func (s *Service) List(ctx context.Context, user uuid.UUID, page, limit int) ([]models.ChatConversationView, error) {
 	if page < 1 || page > 100000 || limit < 1 || limit > 100 {
 		return nil, shared.ErrInvalid
 	}

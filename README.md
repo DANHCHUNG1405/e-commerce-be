@@ -2,7 +2,7 @@
 
 Seller Center và tài xế nội bộ: [API và luồng tích hợp](docs/seller-driver-api.md).
 
-Realtime chat dùng WebSocket thuần tại `/api/v1/ws`: [hướng dẫn frontend](docs/websocket.md). Cấu hình origin bằng `WEBSOCKET_ORIGINS`; không còn endpoint Socket.IO.
+Realtime chat dùng WebSocket thuần tại `/api/v1/ws`: [hướng dẫn frontend](docs/websocket.md). `cmd/chat` sở hữu WebSocket và nghiệp vụ chat; API chính gọi nội bộ qua gRPC và giữ nguyên URL public. Cấu hình origin bằng `WEBSOCKET_ORIGINS`; không còn endpoint Socket.IO.
 
 Mở rộng marketplace: [tiến độ và phần còn lại](docs/marketplace-roadmap.md), [cấu hình SePay QR/webhook](docs/sepay.md).
 

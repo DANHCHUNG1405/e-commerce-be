@@ -12,7 +12,6 @@ import (
 )
 
 type Config struct {
-	WebSocketOrigins       []string
 	SePay                  payment.Config
 	Environment            string
 	Port                   string
@@ -28,6 +27,8 @@ type Config struct {
 	SMTPFrom               string
 	PasswordResetURL       string
 	NotificationServiceURL string
+	ChatServiceURL         string
+	ChatGRPCTarget         string
 }
 
 func Load() (Config, error) {
@@ -49,20 +50,11 @@ func Load() (Config, error) {
 		SMTPFrom:               os.Getenv("SMTP_FROM"),
 		PasswordResetURL:       os.Getenv("PASSWORD_RESET_URL"),
 		NotificationServiceURL: valueOrDefault("NOTIFICATION_SERVICE_URL", "http://notification:8082"),
+		ChatServiceURL:         valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
+		ChatGRPCTarget:         valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
-	}
-	for _, raw := range strings.Split(os.Getenv("WEBSOCKET_ORIGINS"), ",") {
-		origin := strings.TrimSpace(raw)
-		if origin == "" {
-			continue
-		}
-		u, err := url.Parse(origin)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-			return Config{}, errors.New("WEBSOCKET_ORIGINS must contain exact HTTP(S) origins without paths")
-		}
-		cfg.WebSocketOrigins = append(cfg.WebSocketOrigins, origin)
 	}
 	if (cfg.SePay.Bank != "" || cfg.SePay.Account != "" || cfg.SePay.WebhookSecret != "") && !cfg.SePay.Enabled() {
 		return Config{}, errors.New("SePay requires SEPAY_BANK, SEPAY_ACCOUNT_NUMBER and SEPAY_WEBHOOK_SECRET (at least 32 characters)")
@@ -79,6 +71,13 @@ func Load() (Config, error) {
 	notificationURL, err := url.Parse(cfg.NotificationServiceURL)
 	if err != nil || (notificationURL.Scheme != "http" && notificationURL.Scheme != "https") || notificationURL.Host == "" || notificationURL.User != nil || notificationURL.RawQuery != "" || notificationURL.Fragment != "" {
 		return Config{}, errors.New("NOTIFICATION_SERVICE_URL must be an absolute HTTP(S) URL")
+	}
+	chatURL, err := url.Parse(cfg.ChatServiceURL)
+	if err != nil || (chatURL.Scheme != "http" && chatURL.Scheme != "https") || chatURL.Host == "" || chatURL.User != nil || chatURL.RawQuery != "" || chatURL.Fragment != "" {
+		return Config{}, errors.New("CHAT_SERVICE_URL must be an absolute HTTP(S) URL")
+	}
+	if strings.TrimSpace(cfg.ChatGRPCTarget) == "" {
+		return Config{}, errors.New("CHAT_GRPC_TARGET is required")
 	}
 	return cfg, nil
 }

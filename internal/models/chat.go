@@ -11,6 +11,11 @@ type ChatConversation struct {
 	SellerID     uuid.UUID `json:"sellerId"`
 	LastSequence int64     `json:"lastSequence"`
 }
+type ChatConversationView struct {
+	ChatConversation
+	UnreadCount      int64 `json:"unreadCount"`
+	LastReadSequence int64 `json:"lastReadSequence"`
+}
 type ChatMessage struct {
 	Base
 	ConversationID  uuid.UUID `json:"conversationId"`

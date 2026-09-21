@@ -13,6 +13,7 @@ import (
 	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/config"
 	"github.com/example/e-commerce-be/internal/database"
+	"github.com/example/e-commerce-be/internal/grpcchat"
 	httpserver "github.com/example/e-commerce-be/internal/http"
 	"github.com/example/e-commerce-be/internal/mailer"
 )
@@ -49,12 +50,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = redisClient.Close() }()
+	chatConnection, chatClient, err := grpcchat.Dial(cfg.ChatGRPCTarget)
+	if err != nil {
+		slog.Error("chat gRPC client initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer chatConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
 	emailSender := mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, emailSender, cfg.PasswordResetURL, cfg.NotificationServiceURL, mongoClient.Database(cfg.MongoDatabase))
-	closeChat := httpserver.AttachChat(router, db, tokens, redisClient, cfg.WebSocketOrigins)
-	defer closeChat()
+	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,
@@ -72,8 +78,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
-	closeChat()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
