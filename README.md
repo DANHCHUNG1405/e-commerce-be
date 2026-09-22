@@ -5,6 +5,7 @@ Seller Center và tài xế nội bộ: [API và luồng tích hợp](docs/selle
 Realtime chat dùng WebSocket thuần tại `/api/v1/ws`: [hướng dẫn frontend](docs/websocket.md). `cmd/chat` sở hữu WebSocket và nghiệp vụ chat; API chính gọi nội bộ qua gRPC và giữ nguyên URL public. `cmd/identity` sở hữu API auth/profile/address; API chính proxy các URL public, còn Chat kiểm tra tài khoản hoạt động qua gRPC Identity. Cấu hình origin bằng `WEBSOCKET_ORIGINS`; không còn endpoint Socket.IO.
 
 Chat Service tự chạy migration versioned trong schema `chat` và chuyển ba bảng chat được tạo bởi migration lõi cũ từ `public` sang `chat` khi khởi động. API vẫn bootstrap migration lõi trên database mới; không đổi các migration đã áp dụng.
+Identity Service cũng tự chạy migration versioned trong schema `identity` cho `users`, `roles`, `user_roles` và `shipping_addresses`. Trên database mới, API hoàn tất migration lõi trước rồi chờ Identity chuyển bảng trước khi phục vụ request. PostgreSQL vẫn được dùng chung; các foreign key xuyên schema còn tồn tại.
 
 Mở rộng marketplace: [tiến độ và phần còn lại](docs/marketplace-roadmap.md), [cấu hình SePay QR/webhook](docs/sepay.md).
 

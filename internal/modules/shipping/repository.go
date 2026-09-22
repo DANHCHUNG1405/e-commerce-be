@@ -68,7 +68,7 @@ func (r *Repository) DriverStatus(ctx context.Context, u uuid.UUID, status strin
 		return err
 	}
 	if status == "approved" {
-		return r.db.WithContext(ctx).Exec("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE name='driver' ON CONFLICT DO NOTHING", u).Error
+		return r.db.WithContext(ctx).Exec("INSERT INTO identity.user_roles(user_id,role_id) SELECT ?,id FROM identity.roles WHERE name='driver' ON CONFLICT DO NOTHING", u).Error
 	}
 	return nil // Authorization always checks live profile status, never the JWT role alone.
 }

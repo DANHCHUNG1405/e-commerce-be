@@ -82,6 +82,6 @@ func (r *Repository) Read(ctx context.Context, v *models.ChatRead) error {
 }
 func (r *Repository) Recipients(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
 	v := []uuid.UUID{}
-	err := r.db.WithContext(ctx).Raw("SELECT u.id FROM public.users u WHERE u.deleted_at IS NULL AND (u.id IN (SELECT buyer_id FROM chat.chat_conversations WHERE id=?) OR u.id IN (SELECT sm.user_id FROM public.seller_members sm JOIN chat.chat_conversations c ON c.seller_id=sm.seller_id JOIN public.sellers s ON s.id=sm.seller_id WHERE c.id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, id).Scan(&v).Error
+	err := r.db.WithContext(ctx).Raw("SELECT u.id FROM identity.users u WHERE u.deleted_at IS NULL AND (u.id IN (SELECT buyer_id FROM chat.chat_conversations WHERE id=?) OR u.id IN (SELECT sm.user_id FROM public.seller_members sm JOIN chat.chat_conversations c ON c.seller_id=sm.seller_id JOIN public.sellers s ON s.id=sm.seller_id WHERE c.id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, id).Scan(&v).Error
 	return v, err
 }

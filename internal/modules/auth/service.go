@@ -170,7 +170,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*models.Us
 		return nil, TokenPair{}, ErrInvalidCredentials
 	}
 	role := "customer"
-	_ = db.Table("roles").Select("roles.name").Joins("JOIN user_roles ON user_roles.role_id = roles.id").Where("user_roles.user_id = ?", user.ID).Scan(&role).Error
+	_ = db.Table("identity.roles r").Select("r.name").Joins("JOIN identity.user_roles ur ON ur.role_id = r.id").Where("ur.user_id = ?", user.ID).Scan(&role).Error
 	pair, err := s.issueTokens(ctx, user.ID, role)
 	return &user, pair, err
 }

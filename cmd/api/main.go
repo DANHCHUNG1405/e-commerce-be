@@ -34,6 +34,13 @@ func main() {
 		slog.Error("database migration failed", "error", err)
 		os.Exit(1)
 	}
+	identityCtx, cancelIdentity := context.WithTimeout(context.Background(), 2*time.Minute)
+	err = database.WaitIdentitySchema(identityCtx, db)
+	cancelIdentity()
+	if err != nil {
+		slog.Error("identity schema unavailable", "error", err)
+		os.Exit(1)
+	}
 	mongoClient, err := database.ConnectMongo(context.Background(), cfg.MongoURL)
 	if err != nil {
 		slog.Error("mongo connection failed", "error", err)

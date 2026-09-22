@@ -17,14 +17,23 @@ type User struct {
 	Password string `gorm:"not null" json:"-"`
 	FullName string `json:"fullName"`
 }
+
+func (User) TableName() string { return "identity.users" }
+
 type Role struct {
 	Base
 	Name string `gorm:"uniqueIndex;not null" json:"name"`
 }
+
+func (Role) TableName() string { return "identity.roles" }
+
 type UserRole struct {
 	UserID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	RoleID uuid.UUID `gorm:"type:uuid;primaryKey"`
 }
+
+func (UserRole) TableName() string { return "identity.user_roles" }
+
 type Seller struct {
 	Base
 	Description    string         `json:"description"`
@@ -126,6 +135,9 @@ type ShippingAddress struct {
 	RecipientName, Phone, AddressLine, Ward, District, Province, Country string    `gorm:"not null"`
 	PostalCode                                                           string
 }
+
+func (ShippingAddress) TableName() string { return "identity.shipping_addresses" }
+
 type Payment struct {
 	Base
 	Code          *string `gorm:"uniqueIndex"`

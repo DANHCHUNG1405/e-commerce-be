@@ -48,10 +48,27 @@ func main() {
 		slog.Error("invalid identity configuration", "error", err)
 		os.Exit(1)
 	}
+	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	db, err := database.Connect(cfg.databaseURL)
 	if err != nil {
 		slog.Error("identity database connection failed", "error", err)
 		os.Exit(1)
+	}
+	for {
+		err = database.MigrateIdentity(db)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, database.ErrIdentityBootstrapPending) {
+			slog.Error("identity migration failed", "error", err)
+			os.Exit(1)
+		}
+		select {
+		case <-signalCtx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
 	}
 	redisCtx, cancelRedis := context.WithTimeout(context.Background(), 10*time.Second)
 	redisClient, err := database.ConnectRedis(redisCtx, cfg.redisURL)
@@ -74,7 +91,7 @@ func main() {
 			return err
 		}
 		var tablesReady bool
-		if err := db.WithContext(ctx).Raw("SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.shipping_addresses') IS NOT NULL AND to_regclass('public.roles') IS NOT NULL").Scan(&tablesReady).Error; err != nil {
+		if err := db.WithContext(ctx).Raw("SELECT to_regclass('identity.users') IS NOT NULL AND to_regclass('identity.shipping_addresses') IS NOT NULL AND to_regclass('identity.roles') IS NOT NULL AND to_regclass('identity.user_roles') IS NOT NULL").Scan(&tablesReady).Error; err != nil {
 			return err
 		}
 		if !tablesReady {
@@ -107,8 +124,6 @@ func main() {
 		}
 	}()
 
-	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	select {
 	case <-signalCtx.Done():
 	case err := <-errorsCh:

@@ -23,7 +23,7 @@ func (r *Repository) Within(ctx context.Context, fn func(*Repository) error) err
 }
 func (r *Repository) Admin(ctx context.Context, user uuid.UUID) error {
 	var n int64
-	err := r.DB.WithContext(ctx).Table("user_roles ur").Joins("JOIN roles r ON r.id=ur.role_id").Joins("JOIN users u ON u.id=ur.user_id").Where("ur.user_id=? AND r.name='admin' AND u.deleted_at IS NULL AND r.deleted_at IS NULL", user).Count(&n).Error
+	err := r.DB.WithContext(ctx).Table("identity.user_roles ur").Joins("JOIN identity.roles r ON r.id=ur.role_id").Joins("JOIN identity.users u ON u.id=ur.user_id").Where("ur.user_id=? AND r.name='admin' AND u.deleted_at IS NULL AND r.deleted_at IS NULL", user).Count(&n).Error
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (r *Repository) Admin(ctx context.Context, user uuid.UUID) error {
 }
 func (r *Repository) Seller(ctx context.Context, user, seller uuid.UUID) error {
 	var n int64
-	err := r.DB.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, seller).Count(&n).Error
+	err := r.DB.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, seller).Count(&n).Error
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ func New(r *shared.Repository) *Service { return &Service{repo: r} }
 
 func (s *Service) Permissions(ctx context.Context, u uuid.UUID) (Permissions, error) {
 	var roles []string
-	err := s.repo.DB.WithContext(ctx).Table("roles r").Select("r.name").Joins("JOIN user_roles ur ON ur.role_id=r.id").Where("ur.user_id=?", u).Order("r.name").Scan(&roles).Error
+	err := s.repo.DB.WithContext(ctx).Table("identity.roles r").Select("r.name").Joins("JOIN identity.user_roles ur ON ur.role_id=r.id").Where("ur.user_id=?", u).Order("r.name").Scan(&roles).Error
 	if err != nil {
 		return Permissions{}, err
 	}

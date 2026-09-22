@@ -25,7 +25,7 @@ func (r *ManagementRepository) Profile(ctx context.Context, id uuid.UUID) (model
 
 func (r *ManagementRepository) AdminList(ctx context.Context, status string, p, l int) ([]AdminSeller, error) {
 	items := []AdminSeller{}
-	q := r.db.WithContext(ctx).Table("sellers s").Select("s.*, u.id AS owner_id, u.email AS owner_email").Joins("LEFT JOIN seller_members sm ON sm.seller_id=s.id AND sm.role='owner'").Joins("LEFT JOIN users u ON u.id=sm.user_id").Where("s.deleted_at IS NULL")
+	q := r.db.WithContext(ctx).Table("sellers s").Select("s.*, u.id AS owner_id, u.email AS owner_email").Joins("LEFT JOIN seller_members sm ON sm.seller_id=s.id AND sm.role='owner'").Joins("LEFT JOIN identity.users u ON u.id=sm.user_id").Where("s.deleted_at IS NULL")
 	if status != "" {
 		q = q.Where("s.status=?", status)
 	}

@@ -26,7 +26,7 @@ func (r *Repository) Used(ctx context.Context, coupon, user uuid.UUID) (bool, er
 	return n > 0, err
 }
 func (r *Repository) CartLines(ctx context.Context, user uuid.UUID, ids []uuid.UUID) ([]Line, error) {
-	base := r.db.WithContext(ctx).Table("cart_items ci").Joins("JOIN carts c ON c.id=ci.cart_id").Joins("JOIN users u ON u.id=c.user_id").Where("c.user_id=? AND ci.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL", user)
+	base := r.db.WithContext(ctx).Table("cart_items ci").Joins("JOIN carts c ON c.id=ci.cart_id").Joins("JOIN identity.users u ON u.id=c.user_id").Where("c.user_id=? AND ci.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL", user)
 	if len(ids) > 0 {
 		base = base.Where("ci.variant_id IN ?", ids)
 	}
@@ -52,7 +52,7 @@ func (r *Repository) Manage(ctx context.Context, user uuid.UUID, seller *uuid.UU
 		return shared.New(r.db).Admin(ctx, user)
 	}
 	var n int64
-	err := r.db.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager') AND s.status='approved' AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, *seller).Count(&n).Error
+	err := r.db.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager') AND s.status='approved' AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, *seller).Count(&n).Error
 	if err != nil {
 		return err
 	}
