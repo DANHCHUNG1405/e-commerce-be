@@ -6,6 +6,7 @@ Realtime chat dùng WebSocket thuần tại `/api/v1/ws`: [hướng dẫn fronte
 
 Chat Service tự chạy migration versioned trong schema `chat` và chuyển ba bảng chat được tạo bởi migration lõi cũ từ `public` sang `chat` khi khởi động. API vẫn bootstrap migration lõi trên database mới; không đổi các migration đã áp dụng.
 Identity Service cũng tự chạy migration versioned trong schema `identity` cho `users`, `roles`, `user_roles` và `shipping_addresses`. Trên database mới, API hoàn tất migration lõi trước rồi chờ Identity chuyển bảng trước khi phục vụ request. PostgreSQL vẫn được dùng chung; các foreign key xuyên schema còn tồn tại.
+Seller Service (`cmd/seller`) tự chuyển `sellers` và `seller_members` sang schema `seller` sau migration lõi 0010. API proxy các endpoint cửa hàng/thành viên tại URL cũ, còn dashboard, đơn hàng và tồn kho vẫn do API xử lý. Chat dùng gRPC Seller để kiểm tra trạng thái cửa hàng khi mở hội thoại. PostgreSQL vẫn dùng chung; các truy vấn và foreign key xuyên schema còn tồn tại ở các domain khác.
 
 Mở rộng marketplace: [tiến độ và phần còn lại](docs/marketplace-roadmap.md), [cấu hình SePay QR/webhook](docs/sepay.md).
 
@@ -22,7 +23,7 @@ Backend REST API viết bằng Go, Gin, GORM, PostgreSQL và MongoDB.
 
 1. Sao chép `.env.example` thành `.env`.
 2. Chạy PostgreSQL và API bằng `docker compose up --build`.
-3. Kiểm tra API tại `http://localhost:8080/health`, Notification Service tại `http://localhost:8082/health`, Chat Service tại `http://localhost:8083/health`, Identity Service tại `http://localhost:8084/health` và readiness tương ứng tại `/ready`.
+3. Kiểm tra API tại `http://localhost:8080/health`, Notification Service tại `http://localhost:8082/health`, Chat Service tại `http://localhost:8083/health`, Identity Service tại `http://localhost:8084/health`, Seller Service tại `http://localhost:8085/health` và readiness tương ứng tại `/ready`.
 
 Để chạy không dùng Docker, cần PostgreSQL, MongoDB và Redis đang chạy (hoặc dùng các URI cloud), đặt `DATABASE_URL`, `MONGO_URL` và `REDIS_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`. Dùng scheme `rediss://` cho Redis TLS.
 

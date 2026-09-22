@@ -18,14 +18,6 @@ func CatalogRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *catalog.Service)
 		d, e := s.SellerDetail(c.Request.Context(), User(c), shop, id)
 		Reply(c, 200, d, e)
 	})
-	v.GET("/sellers/:seller", func(c *gin.Context) {
-		id, ok := ID(c, "seller")
-		if !ok {
-			return
-		}
-		data, err := s.Shop(c.Request.Context(), id)
-		Reply(c, 200, data, err)
-	})
 	v.GET("/sellers/:seller/products", auth, func(c *gin.Context) {
 		id, ok := ID(c, "seller")
 		if !ok {

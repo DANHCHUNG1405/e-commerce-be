@@ -41,6 +41,13 @@ func main() {
 		slog.Error("identity schema unavailable", "error", err)
 		os.Exit(1)
 	}
+	sellerCtx, cancelSeller := context.WithTimeout(context.Background(), 2*time.Minute)
+	err = database.WaitSellerSchema(sellerCtx, db)
+	cancelSeller()
+	if err != nil {
+		slog.Error("seller schema unavailable", "error", err)
+		os.Exit(1)
+	}
 	mongoClient, err := database.ConnectMongo(context.Background(), cfg.MongoURL)
 	if err != nil {
 		slog.Error("mongo connection failed", "error", err)
@@ -64,7 +71,7 @@ func main() {
 	defer chatConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, mongoClient.Database(cfg.MongoDatabase))
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

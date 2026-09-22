@@ -50,7 +50,7 @@ func (s *Service) Search(ctx context.Context, f Filter, page, limit int) ([]mode
 	return (&BrowseRepository{db: s.repo.DB}).Search(ctx, f, page, limit)
 }
 func (r *BrowseRepository) Search(ctx context.Context, f Filter, page, limit int) ([]models.Product, error) {
-	q := r.db.WithContext(ctx).Model(&models.Product{}).Where("products.deleted_at IS NULL AND products.status='published' AND products.seller_id IN (SELECT id FROM sellers WHERE status='approved' AND deleted_at IS NULL)")
+	q := r.db.WithContext(ctx).Model(&models.Product{}).Where("products.deleted_at IS NULL AND products.status='published' AND products.seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)")
 	if f.Query != "" {
 		q = q.Where("products.name ILIKE ?", "%"+strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(f.Query)+"%")
 	}

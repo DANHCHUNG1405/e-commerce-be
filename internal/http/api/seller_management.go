@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SellerManagementRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.Management) {
+func SellerOwnedManagementRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.Management) {
 	v.GET("/admin/sellers", auth, func(c *gin.Context) {
 		p, l, ok := Page(c)
 		if !ok {
@@ -88,6 +88,10 @@ func SellerManagementRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.
 	}
 	a.PUT("/members/:user", member(false))
 	a.DELETE("/members/:user", member(true))
+}
+
+func SellerCrossDomainRoutes(v *gin.RouterGroup, auth gin.HandlerFunc, s *seller.Management) {
+	a := v.Group("/sellers/:seller", auth)
 	a.GET("/dashboard", func(c *gin.Context) {
 		id, ok := ID(c, "seller")
 		if !ok {

@@ -5,6 +5,7 @@ import (
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 	"math"
 	"strings"
 	"time"
@@ -20,15 +21,19 @@ type Limiter interface {
 type ActiveUserChecker interface {
 	Active(context.Context, uuid.UUID) error
 }
+type SellerStatusChecker interface {
+	GetSeller(context.Context, uuid.UUID) (string, error)
+}
 type Service struct {
 	repo      *Repository
 	publisher Publisher
 	limiter   Limiter
 	users     ActiveUserChecker
+	sellers   SellerStatusChecker
 }
 
-func New(r *Repository, p Publisher, l Limiter, users ActiveUserChecker) *Service {
-	return &Service{repo: r, publisher: p, limiter: l, users: users}
+func New(r *Repository, p Publisher, l Limiter, users ActiveUserChecker, sellers SellerStatusChecker) *Service {
+	return &Service{repo: r, publisher: p, limiter: l, users: users, sellers: sellers}
 }
 func (s *Service) Active(ctx context.Context, user uuid.UUID) error {
 	return s.users.Active(ctx, user)
@@ -48,6 +53,13 @@ func (s *Service) Open(ctx context.Context, user, seller uuid.UUID) (models.Chat
 	}
 	if err := s.limit(ctx, user, "open", 20, time.Minute); err != nil {
 		return models.ChatConversation{}, err
+	}
+	status, err := s.sellers.GetSeller(ctx, seller)
+	if err != nil {
+		return models.ChatConversation{}, err
+	}
+	if status != "approved" {
+		return models.ChatConversation{}, gorm.ErrRecordNotFound
 	}
 	return s.repo.Open(ctx, user, seller)
 }

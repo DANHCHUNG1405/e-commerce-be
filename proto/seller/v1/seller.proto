@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package ecommerce.seller.v1;
+
+option go_package = "github.com/example/e-commerce-be/internal/gen/seller/v1;sellerv1";
+
+message CheckMembershipRequest {
+  string seller_id = 1;
+}
+
+message CheckMembershipResponse {
+  string role = 1;
+  string status = 2;
+}
+
+message GetSellerRequest {
+  string seller_id = 1;
+}
+
+message GetSellerResponse {
+  string seller_id = 1;
+  string status = 2;
+}
+
+service SellerService {
+  rpc CheckMembership(CheckMembershipRequest) returns (CheckMembershipResponse);
+  rpc GetSeller(GetSellerRequest) returns (GetSellerResponse);
+}

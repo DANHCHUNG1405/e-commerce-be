@@ -50,6 +50,10 @@ type SellerMember struct {
 	UserID   uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Role     string    `gorm:"not null"`
 }
+
+func (Seller) TableName() string       { return "seller.sellers" }
+func (SellerMember) TableName() string { return "seller.seller_members" }
+
 type Category struct {
 	Base
 	ParentID *uuid.UUID `gorm:"type:uuid;index"`

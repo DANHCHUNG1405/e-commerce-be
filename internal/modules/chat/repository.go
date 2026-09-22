@@ -21,15 +21,11 @@ func (r *Repository) Access(ctx context.Context, user, id uuid.UUID, lock bool) 
 	if lock {
 		q = q.Clauses(clause.Locking{Strength: "UPDATE"})
 	}
-	err := q.Where("id=? AND deleted_at IS NULL AND (buyer_id=? OR seller_id IN (SELECT sm.seller_id FROM public.seller_members sm JOIN public.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, user, user).First(&c).Error
+	err := q.Where("id=? AND deleted_at IS NULL AND (buyer_id=? OR seller_id IN (SELECT sm.seller_id FROM seller.seller_members sm JOIN seller.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, user, user).First(&c).Error
 	return c, err
 }
 func (r *Repository) Open(ctx context.Context, buyer, seller uuid.UUID) (models.ChatConversation, error) {
 	c := models.ChatConversation{BuyerID: buyer, SellerID: seller}
-	var s models.Seller
-	if err := r.db.WithContext(ctx).Table("public.sellers").Where("id=? AND status='approved' AND deleted_at IS NULL", seller).First(&s).Error; err != nil {
-		return c, err
-	}
 	if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "buyer_id"}, {Name: "seller_id"}}, DoNothing: true}).Create(&c).Error; err != nil {
 		return c, err
 	}
@@ -39,7 +35,7 @@ func (r *Repository) Open(ctx context.Context, buyer, seller uuid.UUID) (models.
 
 func (r *Repository) List(ctx context.Context, user uuid.UUID, page, limit int) ([]models.ChatConversationView, error) {
 	v := []models.ChatConversationView{}
-	err := r.db.WithContext(ctx).Table("chat.chat_conversations c").Select("c.*, COALESCE(cr.last_sequence,0) AS last_read_sequence, (SELECT COUNT(*) FROM chat.chat_messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.sequence>COALESCE(cr.last_sequence,0)) AS unread_count", user).Joins("LEFT JOIN chat.chat_reads cr ON cr.conversation_id=c.id AND cr.user_id=?", user).Where("c.deleted_at IS NULL AND (c.buyer_id=? OR c.seller_id IN (SELECT sm.seller_id FROM public.seller_members sm JOIN public.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", user, user).Order("c.updated_at DESC,c.id").Offset((page - 1) * limit).Limit(limit).Scan(&v).Error
+	err := r.db.WithContext(ctx).Table("chat.chat_conversations c").Select("c.*, COALESCE(cr.last_sequence,0) AS last_read_sequence, (SELECT COUNT(*) FROM chat.chat_messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.sequence>COALESCE(cr.last_sequence,0)) AS unread_count", user).Joins("LEFT JOIN chat.chat_reads cr ON cr.conversation_id=c.id AND cr.user_id=?", user).Where("c.deleted_at IS NULL AND (c.buyer_id=? OR c.seller_id IN (SELECT sm.seller_id FROM seller.seller_members sm JOIN seller.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", user, user).Order("c.updated_at DESC,c.id").Offset((page - 1) * limit).Limit(limit).Scan(&v).Error
 	return v, err
 }
 func (r *Repository) Messages(ctx context.Context, id uuid.UUID, after, before *int64, limit int) ([]models.ChatMessage, error) {
@@ -82,6 +78,6 @@ func (r *Repository) Read(ctx context.Context, v *models.ChatRead) error {
 }
 func (r *Repository) Recipients(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
 	v := []uuid.UUID{}
-	err := r.db.WithContext(ctx).Raw("SELECT u.id FROM identity.users u WHERE u.deleted_at IS NULL AND (u.id IN (SELECT buyer_id FROM chat.chat_conversations WHERE id=?) OR u.id IN (SELECT sm.user_id FROM public.seller_members sm JOIN chat.chat_conversations c ON c.seller_id=sm.seller_id JOIN public.sellers s ON s.id=sm.seller_id WHERE c.id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, id).Scan(&v).Error
+	err := r.db.WithContext(ctx).Raw("SELECT u.id FROM identity.users u WHERE u.deleted_at IS NULL AND (u.id IN (SELECT buyer_id FROM chat.chat_conversations WHERE id=?) OR u.id IN (SELECT sm.user_id FROM seller.seller_members sm JOIN chat.chat_conversations c ON c.seller_id=sm.seller_id JOIN seller.sellers s ON s.id=sm.seller_id WHERE c.id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, id).Scan(&v).Error
 	return v, err
 }

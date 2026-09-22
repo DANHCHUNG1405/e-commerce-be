@@ -26,10 +26,10 @@ import (
 )
 
 func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, metadataDB ...*mongo.Database) *gin.Engine {
-	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, "", "", metadataDB...)
+	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, "", "", "", metadataDB...)
 }
 
-func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL string, metadataDB ...*mongo.Database) *gin.Engine {
+func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -51,15 +51,16 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 
 	v1 := router.Group("/api/v1")
 	identityProxyRoutes(v1, identityServiceURL)
+	sellerProxyRoutes(v1, middleware.RequireAccessToken(tokenService), sellerServiceURL)
 	repo := shared.New(db)
 	api.DeliveryRoutes(v1, middleware.RequireAccessToken(tokenService), shipping.New(shipping.NewRepository(db)))
-	api.SellerManagementRoutes(v1, middleware.RequireAccessToken(tokenService), seller.NewManagement(seller.NewManagementRepository(db)))
+	api.SellerCrossDomainRoutes(v1, middleware.RequireAccessToken(tokenService), seller.NewManagement(seller.NewManagementRepository(db)))
 	api.VoucherRoutes(v1, middleware.RequireAccessToken(tokenService), voucher.New(voucher.NewRepository(db)))
 	api.CatalogRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo))
 	if len(metadataDB) > 0 && metadataDB[0] != nil {
 		api.MetadataRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), catalog.NewMetadataRepository(metadataDB[0]))
 	}
-	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), seller.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
+	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))
 	notificationProxyRoutes(v1, middleware.RequireAccessToken(tokenService), notificationServiceURL)

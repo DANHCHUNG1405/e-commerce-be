@@ -20,6 +20,7 @@ import (
 	chatv1 "github.com/example/e-commerce-be/internal/gen/chat/v1"
 	"github.com/example/e-commerce-be/internal/grpcchat"
 	"github.com/example/e-commerce-be/internal/grpcidentity"
+	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/chatserver"
 	"github.com/joho/godotenv"
@@ -33,6 +34,7 @@ type config struct {
 	httpPort       string
 	grpcPort       string
 	identityTarget string
+	sellerTarget   string
 	origins        []string
 }
 
@@ -79,9 +81,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer identityConnection.Close()
+	sellerConnection, sellerClient, err := grpcseller.Dial(cfg.sellerTarget)
+	if err != nil {
+		slog.Error("seller gRPC client initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer sellerConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.jwtSecret)
-	runtime := chatserver.New(db, tokens, redisClient, cfg.origins, identityClient)
+	runtime := chatserver.New(db, tokens, redisClient, cfg.origins, identityClient, sellerClient)
 	defer runtime.Close()
 
 	listener, err := net.Listen("tcp", ":"+cfg.grpcPort)
@@ -140,6 +148,7 @@ func loadConfig() (config, error) {
 		httpPort:       value("CHAT_HTTP_PORT", "8083"),
 		grpcPort:       value("CHAT_GRPC_PORT", "9091"),
 		identityTarget: value("IDENTITY_GRPC_TARGET", "identity:9092"),
+		sellerTarget:   value("SELLER_GRPC_TARGET", "seller:9093"),
 	}
 	if cfg.databaseURL == "" || cfg.redisURL == "" || cfg.jwtSecret == "" {
 		return config{}, errors.New("DATABASE_URL, REDIS_URL and JWT_SECRET are required")
@@ -152,6 +161,9 @@ func loadConfig() (config, error) {
 	}
 	if strings.TrimSpace(cfg.identityTarget) == "" {
 		return config{}, errors.New("IDENTITY_GRPC_TARGET is required")
+	}
+	if strings.TrimSpace(cfg.sellerTarget) == "" {
+		return config{}, errors.New("SELLER_GRPC_TARGET is required")
 	}
 	for _, raw := range strings.Split(os.Getenv("WEBSOCKET_ORIGINS"), ",") {
 		origin := strings.TrimSpace(raw)

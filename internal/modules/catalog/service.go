@@ -32,12 +32,12 @@ type Detail struct {
 
 func (s *Service) List(ctx context.Context, q string, p, l int) ([]models.Product, error) {
 	out := []models.Product{}
-	err := s.repo.List(ctx, &out, "deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM sellers WHERE status='approved' AND deleted_at IS NULL) AND name ILIKE ?", []any{"%" + q + "%"}, p, l)
+	err := s.repo.List(ctx, &out, "deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL) AND name ILIKE ?", []any{"%" + q + "%"}, p, l)
 	return out, err
 }
 func (s *Service) Detail(ctx context.Context, id uuid.UUID) (Detail, error) {
 	d := Detail{Variants: []models.ProductVariant{}, Images: []models.ProductImage{}}
-	err := s.repo.One(ctx, &d.Product, "id=? AND deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM sellers WHERE status='approved' AND deleted_at IS NULL)", id)
+	err := s.repo.One(ctx, &d.Product, "id=? AND deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)", id)
 	if err != nil {
 		return d, err
 	}

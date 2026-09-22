@@ -86,7 +86,7 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 				return err
 			}
 			var p models.Product
-			if err := tx.Where("id=? AND status='published' AND deleted_at IS NULL AND seller_id IN (SELECT id FROM sellers WHERE status='approved' AND deleted_at IS NULL)", v.ProductID).First(&p).Error; err != nil {
+			if err := tx.Where("id=? AND status='published' AND deleted_at IS NULL AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)", v.ProductID).First(&p).Error; err != nil {
 				return err
 			}
 			if item.Quantity < 1 || item.Quantity > 10000 || v.Stock < item.Quantity || v.Price < 0 || v.Price > 1000000000000 {

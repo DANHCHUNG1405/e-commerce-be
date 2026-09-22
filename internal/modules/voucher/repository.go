@@ -38,7 +38,7 @@ func (r *Repository) CartLines(ctx context.Context, user uuid.UUID, ids []uuid.U
 		return nil, shared.ErrConflict
 	}
 	v := []Line{}
-	err := base.Select("p.seller_id, v.price * ci.quantity AS amount").Joins("JOIN product_variants v ON v.id=ci.variant_id").Joins("JOIN products p ON p.id=v.product_id").Joins("JOIN sellers s ON s.id=p.seller_id").Where("v.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='published' AND s.deleted_at IS NULL AND s.status='approved' AND ci.quantity BETWEEN 1 AND 10000 AND v.price BETWEEN 0 AND 1000000000000 AND v.stock>=ci.quantity").Order("ci.variant_id").Scan(&v).Error
+	err := base.Select("p.seller_id, v.price * ci.quantity AS amount").Joins("JOIN product_variants v ON v.id=ci.variant_id").Joins("JOIN products p ON p.id=v.product_id").Joins("JOIN seller.sellers s ON s.id=p.seller_id").Where("v.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='published' AND s.deleted_at IS NULL AND s.status='approved' AND ci.quantity BETWEEN 1 AND 10000 AND v.price BETWEEN 0 AND 1000000000000 AND v.stock>=ci.quantity").Order("ci.variant_id").Scan(&v).Error
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (r *Repository) Manage(ctx context.Context, user uuid.UUID, seller *uuid.UU
 		return shared.New(r.db).Admin(ctx, user)
 	}
 	var n int64
-	err := r.db.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager') AND s.status='approved' AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, *seller).Count(&n).Error
+	err := r.db.WithContext(ctx).Table("seller.seller_members sm").Joins("JOIN seller.sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager') AND s.status='approved' AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, *seller).Count(&n).Error
 	if err != nil {
 		return err
 	}

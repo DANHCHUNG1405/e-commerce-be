@@ -30,7 +30,7 @@ func (r *Repository) Put(ctx context.Context, user, variant uuid.UUID, qty int) 
 			return tx.Where("cart_id=? AND variant_id=?", c.ID, variant).Delete(&models.CartItem{}).Error
 		}
 		var v models.ProductVariant
-		if err := tx.Where("id=? AND deleted_at IS NULL AND product_id IN (SELECT p.id FROM products p JOIN sellers s ON s.id=p.seller_id WHERE p.status='published' AND p.deleted_at IS NULL AND s.status='approved' AND s.deleted_at IS NULL)", variant).First(&v).Error; err != nil {
+		if err := tx.Where("id=? AND deleted_at IS NULL AND product_id IN (SELECT p.id FROM products p JOIN seller.sellers s ON s.id=p.seller_id WHERE p.status='published' AND p.deleted_at IS NULL AND s.status='approved' AND s.deleted_at IS NULL)", variant).First(&v).Error; err != nil {
 			return err
 		}
 		if v.Stock < qty {

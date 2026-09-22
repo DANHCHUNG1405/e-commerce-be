@@ -11,6 +11,12 @@ import (
 type Service struct{ repo *shared.Repository }
 
 func New(r *shared.Repository) *Service { return &Service{repo: r} }
+func (s *Service) Public(ctx context.Context, id uuid.UUID) (models.Seller, error) {
+	var shop models.Seller
+	err := s.repo.One(ctx, &shop, "id=? AND status='approved' AND deleted_at IS NULL", id)
+	shop.PickupAddress = nil
+	return shop, err
+}
 func (s *Service) Create(ctx context.Context, user uuid.UUID, name, slug string) (models.Seller, error) {
 	v := models.Seller{Name: name, Slug: slug, Status: "pending"}
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(slug) == "" {
@@ -26,7 +32,7 @@ func (s *Service) Create(ctx context.Context, user uuid.UUID, name, slug string)
 }
 func (s *Service) Mine(ctx context.Context, user uuid.UUID, p, l int) ([]models.Seller, error) {
 	v := []models.Seller{}
-	err := s.repo.List(ctx, &v, "deleted_at IS NULL AND id IN (SELECT seller_id FROM seller_members WHERE user_id=?)", []any{user}, p, l)
+	err := s.repo.List(ctx, &v, "deleted_at IS NULL AND id IN (SELECT seller_id FROM seller.seller_members WHERE user_id=?)", []any{user}, p, l)
 	return v, err
 }
 func (s *Service) Status(ctx context.Context, user, id uuid.UUID, status string) error {

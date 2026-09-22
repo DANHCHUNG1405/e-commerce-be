@@ -50,7 +50,7 @@ func (s *Service) Permissions(ctx context.Context, u uuid.UUID) (Permissions, er
 
 func (s *Service) SellerMemberships(ctx context.Context, u uuid.UUID) ([]SellerMembership, error) {
 	items := []SellerMembership{}
-	err := s.repo.DB.WithContext(ctx).Table("seller_members sm").Select("sm.seller_id, s.name AS seller_name, s.slug AS seller_slug, s.status AS seller_status, sm.role").Joins("JOIN sellers s ON s.id=sm.seller_id").Where("sm.user_id=? AND s.deleted_at IS NULL", u).Order("s.name, sm.role").Scan(&items).Error
+	err := s.repo.DB.WithContext(ctx).Table("seller.seller_members sm").Select("sm.seller_id, s.name AS seller_name, s.slug AS seller_slug, s.status AS seller_status, sm.role").Joins("JOIN seller.sellers s ON s.id=sm.seller_id").Where("sm.user_id=? AND s.deleted_at IS NULL", u).Order("s.name, sm.role").Scan(&items).Error
 	return items, err
 }
 func (s *Service) Profile(ctx context.Context, user uuid.UUID, name string) error {

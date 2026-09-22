@@ -34,7 +34,7 @@ func (r *Repository) Admin(ctx context.Context, user uuid.UUID) error {
 }
 func (r *Repository) Seller(ctx context.Context, user, seller uuid.UUID) error {
 	var n int64
-	err := r.DB.WithContext(ctx).Table("seller_members sm").Joins("JOIN sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, seller).Count(&n).Error
+	err := r.DB.WithContext(ctx).Table("seller.seller_members sm").Joins("JOIN seller.sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, seller).Count(&n).Error
 	if err != nil {
 		return err
 	}

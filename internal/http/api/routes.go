@@ -4,13 +4,12 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/cart"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
 	"github.com/example/e-commerce-be/internal/modules/order"
-	"github.com/example/e-commerce-be/internal/modules/seller"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, shops *seller.Service, carts *cart.Service, orders *order.Service) {
+func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, carts *cart.Service, orders *order.Service) {
 	v.GET("/products", func(c *gin.Context) {
 		p, l, ok := Page(c)
 		if !ok {
@@ -51,38 +50,6 @@ func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, sh
 		Reply(c, 200, data, err)
 	})
 	a := v.Group("", auth)
-	a.POST("/sellers", func(c *gin.Context) {
-		var in struct {
-			Name string `json:"name" binding:"required,max=200"`
-			Slug string `json:"slug" binding:"required,max=200"`
-		}
-		if !Bind(c, &in) {
-			return
-		}
-		data, err := shops.Create(c.Request.Context(), User(c), in.Name, in.Slug)
-		Reply(c, 201, data, err)
-	})
-	a.GET("/users/me/sellers", func(c *gin.Context) {
-		p, l, ok := Page(c)
-		if !ok {
-			return
-		}
-		data, err := shops.Mine(c.Request.Context(), User(c), p, l)
-		Reply(c, 200, data, err)
-	})
-	a.PATCH("/admin/sellers/:seller/status", func(c *gin.Context) {
-		id, ok := ID(c, "seller")
-		if !ok {
-			return
-		}
-		var in struct {
-			Status string `json:"status" binding:"required,oneof=approved rejected suspended"`
-		}
-		if !Bind(c, &in) {
-			return
-		}
-		Reply(c, 200, nil, shops.Status(c.Request.Context(), User(c), id, in.Status))
-	})
 	a.POST("/admin/categories", func(c *gin.Context) {
 		var in struct {
 			Name     string     `json:"name" binding:"required,max=200"`

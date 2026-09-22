@@ -33,9 +33,9 @@ type Runtime struct {
 	once    sync.Once
 }
 
-func New(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client, origins []string, users chat.ActiveUserChecker) *Runtime {
+func New(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client, origins []string, users chat.ActiveUserChecker, sellers chat.SellerStatusChecker) *Runtime {
 	sockets := realtime.New(tokens, origins)
-	service := chat.New(chat.NewRepository(db), sockets, chat.NewRedisLimiter(redisClient), users)
+	service := chat.New(chat.NewRepository(db), sockets, chat.NewRedisLimiter(redisClient), users, sellers)
 	sockets.Bind(service)
 
 	router := gin.New()

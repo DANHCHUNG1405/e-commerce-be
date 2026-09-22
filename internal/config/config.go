@@ -23,6 +23,7 @@ type Config struct {
 	ChatServiceURL         string
 	ChatGRPCTarget         string
 	IdentityServiceURL     string
+	SellerServiceURL       string
 }
 
 func Load() (Config, error) {
@@ -41,6 +42,7 @@ func Load() (Config, error) {
 		ChatServiceURL:         valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
 		ChatGRPCTarget:         valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
 		IdentityServiceURL:     valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
+		SellerServiceURL:       valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -71,6 +73,10 @@ func Load() (Config, error) {
 	identityURL, err := url.Parse(cfg.IdentityServiceURL)
 	if err != nil || (identityURL.Scheme != "http" && identityURL.Scheme != "https") || identityURL.Host == "" || identityURL.User != nil || identityURL.RawQuery != "" || identityURL.Fragment != "" {
 		return Config{}, errors.New("IDENTITY_SERVICE_URL must be an absolute HTTP(S) URL")
+	}
+	sellerURL, err := url.Parse(cfg.SellerServiceURL)
+	if err != nil || (sellerURL.Scheme != "http" && sellerURL.Scheme != "https") || sellerURL.Host == "" || sellerURL.User != nil || sellerURL.RawQuery != "" || sellerURL.Fragment != "" {
+		return Config{}, errors.New("SELLER_SERVICE_URL must be an absolute HTTP(S) URL")
 	}
 	return cfg, nil
 }
