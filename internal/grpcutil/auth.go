@@ -28,7 +28,9 @@ func UnaryAuth(tokens coreauth.TokenService) grpc.UnaryServerInterceptor {
 		if err != nil || idErr != nil || userID == uuid.Nil || claims.Type != "access" {
 			return nil, ToStatus(shared.ErrUnauthorized)
 		}
-		return handler(context.WithValue(ctx, userKey{}, userID), request)
+		ctx = context.WithValue(ctx, userKey{}, userID)
+		ctx = WithAuthorization(ctx, values[0])
+		return handler(ctx, request)
 	}
 }
 

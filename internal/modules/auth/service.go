@@ -214,7 +214,7 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 
 func (s *Service) FindUser(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var user models.User
-	if err := s.db.WithContext(ctx).First(&user, "id = ?", id).Error; err != nil {
+	if err := s.db.WithContext(ctx).First(&user, "id = ? AND deleted_at IS NULL", id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

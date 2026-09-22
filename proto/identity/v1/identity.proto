@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package ecommerce.identity.v1;
+
+option go_package = "github.com/example/e-commerce-be/internal/gen/identity/v1;identityv1";
+
+import "google/protobuf/empty.proto";
+
+service IdentityService {
+  rpc CheckUserActive(CheckUserActiveRequest) returns (google.protobuf.Empty);
+}
+
+message CheckUserActiveRequest {
+  string user_id = 1;
+}

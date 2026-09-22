@@ -15,7 +15,6 @@ import (
 	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/grpcchat"
 	httpserver "github.com/example/e-commerce-be/internal/http"
-	"github.com/example/e-commerce-be/internal/mailer"
 )
 
 func main() {
@@ -58,8 +57,7 @@ func main() {
 	defer chatConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
-	emailSender := mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, emailSender, cfg.PasswordResetURL, cfg.NotificationServiceURL, mongoClient.Database(cfg.MongoDatabase))
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

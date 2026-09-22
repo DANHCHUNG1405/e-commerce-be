@@ -33,9 +33,9 @@ type Runtime struct {
 	once    sync.Once
 }
 
-func New(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client, origins []string) *Runtime {
+func New(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client, origins []string, users chat.ActiveUserChecker) *Runtime {
 	sockets := realtime.New(tokens, origins)
-	service := chat.New(chat.NewRepository(db), sockets, chat.NewRedisLimiter(redisClient))
+	service := chat.New(chat.NewRepository(db), sockets, chat.NewRedisLimiter(redisClient), users)
 	sockets.Bind(service)
 
 	router := gin.New()
@@ -50,6 +50,11 @@ func New(db *gorm.DB, tokens coreauth.TokenService, redisClient *redis.Client, o
 	router.GET("/ready", func(c *gin.Context) {
 		sqlDB, err := db.DB()
 		if err != nil || sqlDB.PingContext(c.Request.Context()) != nil || redisClient.Ping(c.Request.Context()).Err() != nil {
+			response.Failure(c, http.StatusServiceUnavailable, "dependency unavailable")
+			return
+		}
+		var schemaReady bool
+		if err := db.WithContext(c.Request.Context()).Raw("SELECT to_regclass('chat.chat_conversations') IS NOT NULL AND to_regclass('chat.chat_messages') IS NOT NULL AND to_regclass('chat.chat_reads') IS NOT NULL").Scan(&schemaReady).Error; err != nil || !schemaReady {
 			response.Failure(c, http.StatusServiceUnavailable, "dependency unavailable")
 			return
 		}

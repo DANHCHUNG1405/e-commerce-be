@@ -6,12 +6,11 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/seller"
 	"github.com/example/e-commerce-be/internal/modules/shared"
-	"github.com/example/e-commerce-be/internal/modules/user"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, shops *seller.Service, users *user.Service, carts *cart.Service, orders *order.Service) {
+func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, shops *seller.Service, carts *cart.Service, orders *order.Service) {
 	v.GET("/products", func(c *gin.Context) {
 		p, l, ok := Page(c)
 		if !ok {
@@ -52,58 +51,6 @@ func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, sh
 		Reply(c, 200, data, err)
 	})
 	a := v.Group("", auth)
-	a.GET("/users/me/permissions", func(c *gin.Context) {
-		d, e := users.Permissions(c.Request.Context(), User(c))
-		Reply(c, 200, d, e)
-	})
-	a.GET("/users/me/seller-memberships", func(c *gin.Context) {
-		d, e := users.SellerMemberships(c.Request.Context(), User(c))
-		Reply(c, 200, d, e)
-	})
-	a.PATCH("/users/me", func(c *gin.Context) {
-		var in struct {
-			FullName string `json:"fullName" binding:"required,max=200"`
-		}
-		if !Bind(c, &in) {
-			return
-		}
-		Reply(c, 200, nil, users.Profile(c.Request.Context(), User(c), in.FullName))
-	})
-	a.GET("/users/me/addresses", func(c *gin.Context) {
-		p, l, ok := Page(c)
-		if !ok {
-			return
-		}
-		data, err := users.Addresses(c.Request.Context(), User(c), p, l)
-		Reply(c, 200, data, err)
-	})
-	a.POST("/users/me/addresses", func(c *gin.Context) {
-		var in user.AddressInput
-		if !Bind(c, &in) {
-			return
-		}
-		data, err := users.SaveAddress(c.Request.Context(), User(c), uuid.Nil, in)
-		Reply(c, 201, data, err)
-	})
-	a.PUT("/users/me/addresses/:id", func(c *gin.Context) {
-		id, ok := ID(c, "id")
-		if !ok {
-			return
-		}
-		var in user.AddressInput
-		if !Bind(c, &in) {
-			return
-		}
-		data, err := users.SaveAddress(c.Request.Context(), User(c), id, in)
-		Reply(c, 200, data, err)
-	})
-	a.DELETE("/users/me/addresses/:id", func(c *gin.Context) {
-		id, ok := ID(c, "id")
-		if !ok {
-			return
-		}
-		Reply(c, 200, nil, users.DeleteAddress(c.Request.Context(), User(c), id))
-	})
 	a.POST("/sellers", func(c *gin.Context) {
 		var in struct {
 			Name string `json:"name" binding:"required,max=200"`

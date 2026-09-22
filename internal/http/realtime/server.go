@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	coreauth "github.com/example/e-commerce-be/internal/auth"
+	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/response"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/chat"
@@ -166,6 +167,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authCtx, authCancel := context.WithTimeout(ctx, authTimeout)
+	authCtx = grpcutil.WithAuthorization(authCtx, "Bearer "+auth.Token)
 	err = s.service.Active(authCtx, user)
 	authCancel()
 	if err != nil || !time.Now().Before(claims.ExpiresAt.Time) {

@@ -11,5 +11,5 @@ FROM alpine:3.22
 RUN adduser -D -H appuser
 USER appuser
 COPY --from=build /app-bin /app-bin
-EXPOSE 8080 8082 8083 9091
+EXPOSE 8080 8082 8083 8084 9091 9092
 ENTRYPOINT ["/app-bin"]

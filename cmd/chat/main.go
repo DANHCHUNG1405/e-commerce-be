@@ -19,6 +19,7 @@ import (
 	"github.com/example/e-commerce-be/internal/database"
 	chatv1 "github.com/example/e-commerce-be/internal/gen/chat/v1"
 	"github.com/example/e-commerce-be/internal/grpcchat"
+	"github.com/example/e-commerce-be/internal/grpcidentity"
 	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/chatserver"
 	"github.com/joho/godotenv"
@@ -26,12 +27,13 @@ import (
 )
 
 type config struct {
-	databaseURL string
-	redisURL    string
-	jwtSecret   string
-	httpPort    string
-	grpcPort    string
-	origins     []string
+	databaseURL    string
+	redisURL       string
+	jwtSecret      string
+	httpPort       string
+	grpcPort       string
+	identityTarget string
+	origins        []string
 }
 
 func main() {
@@ -41,10 +43,27 @@ func main() {
 		slog.Error("invalid chat configuration", "error", err)
 		os.Exit(1)
 	}
+	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	db, err := database.Connect(cfg.databaseURL)
 	if err != nil {
 		slog.Error("chat database connection failed", "error", err)
 		os.Exit(1)
+	}
+	for {
+		err = database.MigrateChat(db)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, database.ErrChatBootstrapPending) {
+			slog.Error("chat migration failed", "error", err)
+			os.Exit(1)
+		}
+		select {
+		case <-signalCtx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
 	}
 	redisCtx, cancelRedis := context.WithTimeout(context.Background(), 10*time.Second)
 	redisClient, err := database.ConnectRedis(redisCtx, cfg.redisURL)
@@ -54,9 +73,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer redisClient.Close()
+	identityConnection, identityClient, err := grpcidentity.Dial(cfg.identityTarget)
+	if err != nil {
+		slog.Error("identity gRPC client initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer identityConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.jwtSecret)
-	runtime := chatserver.New(db, tokens, redisClient, cfg.origins)
+	runtime := chatserver.New(db, tokens, redisClient, cfg.origins, identityClient)
 	defer runtime.Close()
 
 	listener, err := net.Listen("tcp", ":"+cfg.grpcPort)
@@ -82,8 +107,6 @@ func main() {
 		}
 	}()
 
-	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	select {
 	case <-signalCtx.Done():
 	case err := <-errorsCh:
@@ -111,11 +134,12 @@ func main() {
 
 func loadConfig() (config, error) {
 	cfg := config{
-		databaseURL: os.Getenv("DATABASE_URL"),
-		redisURL:    os.Getenv("REDIS_URL"),
-		jwtSecret:   os.Getenv("JWT_SECRET"),
-		httpPort:    value("CHAT_HTTP_PORT", "8083"),
-		grpcPort:    value("CHAT_GRPC_PORT", "9091"),
+		databaseURL:    os.Getenv("DATABASE_URL"),
+		redisURL:       os.Getenv("REDIS_URL"),
+		jwtSecret:      os.Getenv("JWT_SECRET"),
+		httpPort:       value("CHAT_HTTP_PORT", "8083"),
+		grpcPort:       value("CHAT_GRPC_PORT", "9091"),
+		identityTarget: value("IDENTITY_GRPC_TARGET", "identity:9092"),
 	}
 	if cfg.databaseURL == "" || cfg.redisURL == "" || cfg.jwtSecret == "" {
 		return config{}, errors.New("DATABASE_URL, REDIS_URL and JWT_SECRET are required")
@@ -125,6 +149,9 @@ func loadConfig() (config, error) {
 	}
 	if err := validPort("CHAT_GRPC_PORT", cfg.grpcPort); err != nil {
 		return config{}, err
+	}
+	if strings.TrimSpace(cfg.identityTarget) == "" {
+		return config{}, errors.New("IDENTITY_GRPC_TARGET is required")
 	}
 	for _, raw := range strings.Split(os.Getenv("WEBSOCKET_ORIGINS"), ",") {
 		origin := strings.TrimSpace(raw)

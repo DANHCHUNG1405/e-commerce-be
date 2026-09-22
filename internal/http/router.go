@@ -8,9 +8,7 @@ import (
 	coreauth "github.com/example/e-commerce-be/internal/auth"
 	"github.com/example/e-commerce-be/internal/http/api"
 	"github.com/example/e-commerce-be/internal/http/middleware"
-	"github.com/example/e-commerce-be/internal/mailer"
 	adminmodule "github.com/example/e-commerce-be/internal/modules/admin"
-	authmodule "github.com/example/e-commerce-be/internal/modules/auth"
 	"github.com/example/e-commerce-be/internal/modules/cart"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
 	"github.com/example/e-commerce-be/internal/modules/order"
@@ -19,7 +17,6 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/seller"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/modules/shipping"
-	"github.com/example/e-commerce-be/internal/modules/user"
 	"github.com/example/e-commerce-be/internal/modules/voucher"
 	"github.com/example/e-commerce-be/internal/modules/wishlist"
 	"github.com/gin-gonic/gin"
@@ -29,10 +26,10 @@ import (
 )
 
 func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, metadataDB ...*mongo.Database) *gin.Engine {
-	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, nil, "", "", metadataDB...)
+	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, "", "", metadataDB...)
 }
 
-func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, emailSender mailer.Sender, passwordResetURL, notificationServiceURL string, metadataDB ...*mongo.Database) *gin.Engine {
+func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL string, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -53,20 +50,7 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 	})
 
 	v1 := router.Group("/api/v1")
-	authService := authmodule.NewService(db, tokenService, redisClient)
-	if emailSender != nil {
-		authService.ConfigurePasswordReset(emailSender, passwordResetURL)
-	}
-	authHandler := authmodule.NewHandler(authService)
-	authRoutes := v1.Group("/auth")
-	authRoutes.POST("/register", authHandler.Register)
-	authRoutes.POST("/login", authHandler.Login)
-	authRoutes.POST("/refresh", authHandler.Refresh)
-	authRoutes.POST("/logout", authHandler.Logout)
-	authRoutes.POST("/change-password", middleware.RequireAccessToken(tokenService), authHandler.ChangePassword)
-	authRoutes.POST("/forgot-password", authHandler.ForgotPassword)
-	authRoutes.POST("/reset-password", authHandler.ResetPassword)
-	authRoutes.GET("/me", middleware.RequireAccessToken(tokenService), authHandler.Me)
+	identityProxyRoutes(v1, identityServiceURL)
 	repo := shared.New(db)
 	api.DeliveryRoutes(v1, middleware.RequireAccessToken(tokenService), shipping.New(shipping.NewRepository(db)))
 	api.SellerManagementRoutes(v1, middleware.RequireAccessToken(tokenService), seller.NewManagement(seller.NewManagementRepository(db)))
@@ -75,7 +59,7 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 	if len(metadataDB) > 0 && metadataDB[0] != nil {
 		api.MetadataRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), catalog.NewMetadataRepository(metadataDB[0]))
 	}
-	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), seller.New(repo), user.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
+	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), seller.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))
 	notificationProxyRoutes(v1, middleware.RequireAccessToken(tokenService), notificationServiceURL)

@@ -17,15 +17,21 @@ type Publisher interface {
 type Limiter interface {
 	Allow(context.Context, uuid.UUID, string, int, time.Duration) error
 }
+type ActiveUserChecker interface {
+	Active(context.Context, uuid.UUID) error
+}
 type Service struct {
 	repo      *Repository
 	publisher Publisher
 	limiter   Limiter
+	users     ActiveUserChecker
 }
 
-func New(r *Repository, p Publisher, l Limiter) *Service { return &Service{r, p, l} }
+func New(r *Repository, p Publisher, l Limiter, users ActiveUserChecker) *Service {
+	return &Service{repo: r, publisher: p, limiter: l, users: users}
+}
 func (s *Service) Active(ctx context.Context, user uuid.UUID) error {
-	return s.repo.ActiveUser(ctx, user)
+	return s.users.Active(ctx, user)
 }
 func (s *Service) limit(ctx context.Context, user uuid.UUID, kind string, n int, d time.Duration) error {
 	if s.limiter == nil {
@@ -36,6 +42,9 @@ func (s *Service) limit(ctx context.Context, user uuid.UUID, kind string, n int,
 func (s *Service) Open(ctx context.Context, user, seller uuid.UUID) (models.ChatConversation, error) {
 	if seller == uuid.Nil || user == uuid.Nil {
 		return models.ChatConversation{}, shared.ErrInvalid
+	}
+	if err := s.Active(ctx, user); err != nil {
+		return models.ChatConversation{}, err
 	}
 	if err := s.limit(ctx, user, "open", 20, time.Minute); err != nil {
 		return models.ChatConversation{}, err
@@ -54,6 +63,9 @@ func (s *Service) List(ctx context.Context, user uuid.UUID, page, limit int) ([]
 func (s *Service) Messages(ctx context.Context, user, id uuid.UUID, after, before *int64, limit int) ([]models.ChatMessage, error) {
 	if limit < 1 || limit > 100 || (after != nil && before != nil) || (after != nil && *after < 0) || (before != nil && *before <= 0) {
 		return nil, shared.ErrInvalid
+	}
+	if err := s.Active(ctx, user); err != nil {
+		return nil, err
 	}
 	if _, err := s.repo.Access(ctx, user, id, false); err != nil {
 		return nil, err
@@ -76,6 +88,9 @@ func (in SendInput) Validate() error {
 func (s *Service) Send(ctx context.Context, user uuid.UUID, in SendInput) (models.ChatMessage, error) {
 	var m models.ChatMessage
 	if err := in.Validate(); err != nil {
+		return m, err
+	}
+	if err := s.Active(ctx, user); err != nil {
 		return m, err
 	}
 	if err := s.limit(ctx, user, "send", 60, time.Minute); err != nil {
@@ -113,6 +128,9 @@ func (s *Service) Read(ctx context.Context, user, id uuid.UUID, seq int64) (mode
 	if id == uuid.Nil || seq < 0 {
 		return v, shared.ErrInvalid
 	}
+	if err := s.Active(ctx, user); err != nil {
+		return v, err
+	}
 	if err := s.limit(ctx, user, "read", 120, time.Minute); err != nil {
 		return v, err
 	}
@@ -134,6 +152,9 @@ func (s *Service) Read(ctx context.Context, user, id uuid.UUID, seq int64) (mode
 func (s *Service) Typing(ctx context.Context, user, id uuid.UUID, typing bool) error {
 	if id == uuid.Nil {
 		return shared.ErrInvalid
+	}
+	if err := s.Active(ctx, user); err != nil {
+		return err
 	}
 	if err := s.limit(ctx, user, "typing", 20, 10*time.Second); err != nil {
 		return err
