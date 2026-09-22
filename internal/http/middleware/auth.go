@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	coreauth "github.com/example/e-commerce-be/internal/auth"
+	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,6 +30,7 @@ func RequireAccessToken(tokens coreauth.TokenService) gin.HandlerFunc {
 		}
 		c.Set("user_id", claims.Subject)
 		c.Set("role", claims.Role)
+		c.Request = c.Request.WithContext(grpcutil.WithAuthorization(c.Request.Context(), c.GetHeader("Authorization")))
 		c.Next()
 	}
 }

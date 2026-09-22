@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
@@ -50,7 +51,7 @@ func (s *Service) Search(ctx context.Context, f Filter, page, limit int) ([]mode
 	return (&BrowseRepository{db: s.repo.DB}).Search(ctx, f, page, limit)
 }
 func (r *BrowseRepository) Search(ctx context.Context, f Filter, page, limit int) ([]models.Product, error) {
-	q := r.db.WithContext(ctx).Model(&models.Product{}).Where("products.deleted_at IS NULL AND products.status='published' AND products.seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)")
+	q := r.db.WithContext(ctx).Model(&models.Product{}).Where("products.deleted_at IS NULL AND products.status='published'")
 	if f.Query != "" {
 		q = q.Where("products.name ILIKE ?", "%"+strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(f.Query)+"%")
 	}
@@ -80,15 +81,69 @@ func (r *BrowseRepository) Search(ctx context.Context, f Filter, page, limit int
 	case "rating":
 		q = q.Order("COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.product_id=products.id AND r.status='published' AND r.deleted_at IS NULL),0) DESC")
 	}
-	v := []models.Product{}
-	err := q.Order("products.created_at DESC, products.id").Offset((page - 1) * limit).Limit(limit).Find(&v).Error
-	return v, err
-}
-func (s *Service) Shop(ctx context.Context, id uuid.UUID) (models.Seller, error) {
-	v := models.Seller{}
-	err := s.repo.One(ctx, &v, "id=? AND status='approved' AND deleted_at IS NULL", id)
-	v.PickupAddress = nil // Public shop pages must not expose private pickup contact details.
-	return v, err
+	q = q.Order("products.created_at DESC, products.id")
+	if f.SellerID != nil {
+		shop, err := shared.GetSellerInfo(ctx, *f.SellerID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []models.Product{}, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if shop.Status != "approved" {
+			return []models.Product{}, nil
+		}
+		v := []models.Product{}
+		err = q.Offset((page - 1) * limit).Limit(limit).Find(&v).Error
+		return v, err
+	}
+	// Seller approval is owned by Seller Service. Scan catalog candidates in
+	// stable order and count only approved results so pagination stays exact.
+	result := make([]models.Product, 0, limit)
+	approvedSeen := 0
+	statuses := map[uuid.UUID]string{}
+	for offset := 0; ; offset += 100 {
+		candidates := []models.Product{}
+		if err := q.Offset(offset).Limit(100).Find(&candidates).Error; err != nil {
+			return nil, err
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		ids := make([]uuid.UUID, 0, len(candidates))
+		queued := map[uuid.UUID]bool{}
+		for _, candidate := range candidates {
+			if _, known := statuses[candidate.SellerID]; !known && !queued[candidate.SellerID] {
+				ids = append(ids, candidate.SellerID)
+				queued[candidate.SellerID] = true
+			}
+		}
+		if len(ids) > 0 {
+			shops, err := shared.BatchSellerInfo(ctx, ids)
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range ids {
+				statuses[id] = shops[id].Status
+			}
+		}
+		for _, candidate := range candidates {
+			if statuses[candidate.SellerID] != "approved" {
+				continue
+			}
+			approvedSeen++
+			if approvedSeen > (page-1)*limit {
+				result = append(result, candidate)
+				if len(result) == limit {
+					return result, nil
+				}
+			}
+		}
+		if len(candidates) < 100 {
+			break
+		}
+	}
+	return result, nil
 }
 func (s *Service) SellerProducts(ctx context.Context, user, seller uuid.UUID, page, limit int, statuses ...string) ([]models.Product, error) {
 	if page < 1 || page > 100000 || limit < 1 || limit > 100 {

@@ -89,7 +89,7 @@ func main() {
 	defer sellerConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.jwtSecret)
-	runtime := chatserver.New(db, tokens, redisClient, cfg.origins, identityClient, sellerClient)
+	runtime := chatserver.New(db, tokens, redisClient, cfg.origins, identityClient, sellerClient.WithServiceIdentity(tokens, "chat"))
 	defer runtime.Close()
 
 	listener, err := net.Listen("tcp", ":"+cfg.grpcPort)

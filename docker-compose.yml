@@ -10,6 +10,7 @@ services:
       CHAT_GRPC_TARGET: chat:9091
       IDENTITY_SERVICE_URL: http://identity:8084
       SELLER_SERVICE_URL: http://seller:8085
+      SELLER_GRPC_TARGET: seller:9093
     depends_on:
       db:
         condition: service_healthy
@@ -86,6 +87,7 @@ services:
     environment:
       IDENTITY_HTTP_PORT: "8084"
       IDENTITY_GRPC_PORT: "9092"
+      SELLER_GRPC_TARGET: seller:9093
     ports:
       - "8084:8084"
     expose:

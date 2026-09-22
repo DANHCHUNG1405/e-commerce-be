@@ -17,6 +17,7 @@ import (
 	"github.com/example/e-commerce-be/internal/database"
 	identityv1 "github.com/example/e-commerce-be/internal/gen/identity/v1"
 	"github.com/example/e-commerce-be/internal/grpcidentity"
+	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/identityapi"
 	"github.com/example/e-commerce-be/internal/mailer"
@@ -33,6 +34,7 @@ type config struct {
 	jwtSecret        string
 	httpPort         string
 	grpcPort         string
+	sellerTarget     string
 	smtpHost         string
 	smtpPort         int
 	smtpUser         string
@@ -82,7 +84,13 @@ func main() {
 	tokens := coreauth.NewTokenService(cfg.jwtSecret)
 	authService := identityauth.NewService(db, tokens, redisClient)
 	authService.ConfigurePasswordReset(mailer.NewSMTP(cfg.smtpHost, cfg.smtpPort, cfg.smtpUser, cfg.smtpPassword, cfg.smtpFrom), cfg.passwordResetURL)
-	userService := user.New(shared.New(db))
+	sellerConnection, sellerClient, err := grpcseller.Dial(cfg.sellerTarget)
+	if err != nil {
+		slog.Error("seller gRPC client initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer sellerConnection.Close()
+	userService := user.New(shared.New(db), sellerClient)
 	ready := func(ctx context.Context) error {
 		if err := database.Ping(ctx, db); err != nil {
 			return err
@@ -154,6 +162,7 @@ func loadConfig() (config, error) {
 		jwtSecret:        os.Getenv("JWT_SECRET"),
 		httpPort:         value("IDENTITY_HTTP_PORT", "8084"),
 		grpcPort:         value("IDENTITY_GRPC_PORT", "9092"),
+		sellerTarget:     value("SELLER_GRPC_TARGET", "seller:9093"),
 		smtpHost:         os.Getenv("SMTP_HOST"),
 		smtpPort:         intValue("SMTP_PORT", 587),
 		smtpUser:         os.Getenv("SMTP_USER"),
@@ -163,6 +172,9 @@ func loadConfig() (config, error) {
 	}
 	if cfg.databaseURL == "" || cfg.redisURL == "" || cfg.jwtSecret == "" {
 		return config{}, errors.New("DATABASE_URL, REDIS_URL and JWT_SECRET are required")
+	}
+	if cfg.sellerTarget == "" {
+		return config{}, errors.New("SELLER_GRPC_TARGET is required")
 	}
 	if err := validPort("IDENTITY_HTTP_PORT", cfg.httpPort); err != nil {
 		return config{}, err

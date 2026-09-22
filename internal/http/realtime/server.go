@@ -174,6 +174,8 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		p.closeCode(4401, "authentication failed")
 		return
 	}
+	// Carry the validated bearer token into every subsequent service call.
+	sessionCtx := grpcutil.WithAuthorization(ctx, "Bearer "+auth.Token)
 	ready, _ := json.Marshal(Event{Event: "auth:ok", Envelope: envelope(map[string]any{"userId": user}, nil)})
 	s.mu.Lock()
 	count := 0
@@ -215,7 +217,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			p.enqueue(Event{Event: "ack", Envelope: envelope(nil, shared.ErrInvalid)})
 			continue
 		}
-		requestCtx, done := context.WithTimeout(ctx, 5*time.Second)
+		requestCtx, done := context.WithTimeout(sessionCtx, 5*time.Second)
 		data, err := s.dispatch(requestCtx, user, frame)
 		done()
 		if !p.enqueue(Event{Event: "ack", RequestID: frame.RequestID, Envelope: envelope(data, err)}) {

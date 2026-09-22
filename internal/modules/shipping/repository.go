@@ -88,9 +88,11 @@ func (r *Repository) Payment(ctx context.Context, id uuid.UUID) (models.Payment,
 	return p, err
 }
 func (r *Repository) Shop(ctx context.Context, id uuid.UUID) (models.Seller, error) {
-	var s models.Seller
-	err := r.db.WithContext(ctx).First(&s, "id=? AND deleted_at IS NULL", id).Error
-	return s, err
+	shop, err := shared.GetSellerOperations(ctx, id)
+	if err != nil {
+		return models.Seller{}, err
+	}
+	return models.Seller{Status: shop.Status, CommissionRate: int(shop.CommissionRate), PickupAddress: shop.PickupAddress}, nil
 }
 func (r *Repository) ByChild(ctx context.Context, id uuid.UUID) (models.Shipment, bool, error) {
 	var s models.Shipment

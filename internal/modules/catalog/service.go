@@ -5,6 +5,7 @@ import (
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 	"strings"
 )
 
@@ -31,15 +32,20 @@ type Detail struct {
 }
 
 func (s *Service) List(ctx context.Context, q string, p, l int) ([]models.Product, error) {
-	out := []models.Product{}
-	err := s.repo.List(ctx, &out, "deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL) AND name ILIKE ?", []any{"%" + q + "%"}, p, l)
-	return out, err
+	return s.Search(ctx, Filter{Query: q}, p, l)
 }
 func (s *Service) Detail(ctx context.Context, id uuid.UUID) (Detail, error) {
 	d := Detail{Variants: []models.ProductVariant{}, Images: []models.ProductImage{}}
-	err := s.repo.One(ctx, &d.Product, "id=? AND deleted_at IS NULL AND status='published' AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)", id)
+	err := s.repo.One(ctx, &d.Product, "id=? AND deleted_at IS NULL AND status='published'", id)
 	if err != nil {
 		return d, err
+	}
+	shop, err := shared.GetSellerInfo(ctx, d.Product.SellerID)
+	if err != nil {
+		return d, err
+	}
+	if shop.Status != "approved" {
+		return d, gorm.ErrRecordNotFound
 	}
 	if err = s.repo.List(ctx, &d.Variants, "product_id=? AND deleted_at IS NULL", []any{id}, 1, 100); err != nil {
 		return d, err

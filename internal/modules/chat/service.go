@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
@@ -21,22 +22,42 @@ type Limiter interface {
 type ActiveUserChecker interface {
 	Active(context.Context, uuid.UUID) error
 }
-type SellerStatusChecker interface {
+type SellerDirectory interface {
 	GetSeller(context.Context, uuid.UUID) (string, error)
+	CheckMembership(context.Context, uuid.UUID) (string, string, error)
+	Memberships(context.Context) ([]grpcseller.Membership, error)
+	Members(context.Context, uuid.UUID) ([]uuid.UUID, error)
 }
 type Service struct {
 	repo      *Repository
 	publisher Publisher
 	limiter   Limiter
 	users     ActiveUserChecker
-	sellers   SellerStatusChecker
+	sellers   SellerDirectory
 }
 
-func New(r *Repository, p Publisher, l Limiter, users ActiveUserChecker, sellers SellerStatusChecker) *Service {
+func New(r *Repository, p Publisher, l Limiter, users ActiveUserChecker, sellers SellerDirectory) *Service {
 	return &Service{repo: r, publisher: p, limiter: l, users: users, sellers: sellers}
 }
 func (s *Service) Active(ctx context.Context, user uuid.UUID) error {
 	return s.users.Active(ctx, user)
+}
+func (s *Service) access(ctx context.Context, repo *Repository, user, id uuid.UUID, lock bool) (models.ChatConversation, error) {
+	conversation, err := repo.Access(ctx, id, lock)
+	if err != nil {
+		return conversation, err
+	}
+	if conversation.BuyerID == user {
+		return conversation, nil
+	}
+	role, _, err := s.sellers.CheckMembership(ctx, conversation.SellerID)
+	if err != nil {
+		return conversation, err
+	}
+	if role != "owner" && role != "manager" && role != "staff" {
+		return conversation, shared.ErrForbidden
+	}
+	return conversation, nil
 }
 func (s *Service) limit(ctx context.Context, user uuid.UUID, kind string, n int, d time.Duration) error {
 	if s.limiter == nil {
@@ -70,7 +91,15 @@ func (s *Service) List(ctx context.Context, user uuid.UUID, page, limit int) ([]
 	if err := s.Active(ctx, user); err != nil {
 		return nil, err
 	}
-	return s.repo.List(ctx, user, page, limit)
+	memberships, err := s.sellers.Memberships(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(memberships))
+	for _, membership := range memberships {
+		ids = append(ids, membership.SellerID)
+	}
+	return s.repo.List(ctx, user, ids, page, limit)
 }
 func (s *Service) Messages(ctx context.Context, user, id uuid.UUID, after, before *int64, limit int) ([]models.ChatMessage, error) {
 	if limit < 1 || limit > 100 || (after != nil && before != nil) || (after != nil && *after < 0) || (before != nil && *before <= 0) {
@@ -79,7 +108,7 @@ func (s *Service) Messages(ctx context.Context, user, id uuid.UUID, after, befor
 	if err := s.Active(ctx, user); err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.Access(ctx, user, id, false); err != nil {
+	if _, err := s.access(ctx, s.repo, user, id, false); err != nil {
 		return nil, err
 	}
 	return s.repo.Messages(ctx, id, after, before, limit)
@@ -109,7 +138,7 @@ func (s *Service) Send(ctx context.Context, user uuid.UUID, in SendInput) (model
 		return m, err
 	}
 	err := s.repo.Within(ctx, func(tx *Repository) error {
-		c, err := tx.Access(ctx, user, in.ConversationID, true)
+		c, err := s.access(ctx, tx, user, in.ConversationID, true)
 		if err != nil {
 			return err
 		}
@@ -147,7 +176,7 @@ func (s *Service) Read(ctx context.Context, user, id uuid.UUID, seq int64) (mode
 		return v, err
 	}
 	err := s.repo.Within(ctx, func(tx *Repository) error {
-		c, err := tx.Access(ctx, user, id, true)
+		c, err := s.access(ctx, tx, user, id, true)
 		if err != nil {
 			return err
 		}
@@ -171,7 +200,7 @@ func (s *Service) Typing(ctx context.Context, user, id uuid.UUID, typing bool) e
 	if err := s.limit(ctx, user, "typing", 20, 10*time.Second); err != nil {
 		return err
 	}
-	if _, err := s.repo.Access(ctx, user, id, false); err != nil {
+	if _, err := s.access(ctx, s.repo, user, id, false); err != nil {
 		return err
 	}
 	s.notify(ctx, id, "chat:typing", map[string]any{"conversationId": id, "userId": user, "typing": typing})
@@ -182,8 +211,22 @@ func (s *Service) notify(ctx context.Context, id uuid.UUID, event string, payloa
 	if s.publisher == nil {
 		return
 	}
-	recipients, err := s.repo.Recipients(ctx, id)
-	if err == nil {
-		s.publisher.Publish(recipients, event, payload)
+	buyer, sellerID, err := s.repo.RecipientBuyer(ctx, id)
+	if err != nil {
+		return
 	}
+	members, err := s.sellers.Members(ctx, sellerID)
+	if err != nil {
+		return
+	}
+	recipients := make([]uuid.UUID, 0, len(members)+1)
+	if buyer != uuid.Nil {
+		recipients = append(recipients, buyer)
+	}
+	for _, member := range members {
+		if member != buyer {
+			recipients = append(recipients, member)
+		}
+	}
+	s.publisher.Publish(recipients, event, payload)
 }

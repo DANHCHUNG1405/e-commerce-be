@@ -6,6 +6,7 @@ import (
 	"time"
 
 	coreauth "github.com/example/e-commerce-be/internal/auth"
+	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/http/api"
 	"github.com/example/e-commerce-be/internal/http/middleware"
 	adminmodule "github.com/example/e-commerce-be/internal/modules/admin"
@@ -26,10 +27,10 @@ import (
 )
 
 func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, metadataDB ...*mongo.Database) *gin.Engine {
-	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, "", "", "", metadataDB...)
+	return NewRouterWithPayment(db, tokenService, redisClient, payment.Config{}, "", "", "", nil, metadataDB...)
 }
 
-func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, metadataDB ...*mongo.Database) *gin.Engine {
+func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -50,6 +51,12 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 	})
 
 	v1 := router.Group("/api/v1")
+	v1.Use(func(c *gin.Context) {
+		if sellerClient != nil {
+			c.Request = c.Request.WithContext(shared.WithSellerDirectory(c.Request.Context(), sellerClient))
+		}
+		c.Next()
+	})
 	identityProxyRoutes(v1, identityServiceURL)
 	sellerProxyRoutes(v1, middleware.RequireAccessToken(tokenService), sellerServiceURL)
 	repo := shared.New(db)

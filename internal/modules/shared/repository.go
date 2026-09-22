@@ -17,6 +17,76 @@ var ErrRateLimited = errors.New("rate limit exceeded")
 // Repository is transaction-scoped. Callers supply fixed SQL, never client SQL.
 type Repository struct{ DB *gorm.DB }
 
+type sellerDirectoryKey struct{}
+type SellerDirectory interface {
+	CheckSellerMembership(context.Context, uuid.UUID, uuid.UUID) (string, string, error)
+	GetSellerInfo(context.Context, uuid.UUID) (SellerInfo, error)
+	BatchSellerInfo(context.Context, []uuid.UUID) (map[uuid.UUID]SellerInfo, error)
+	GetSellerOperations(context.Context, uuid.UUID) (SellerOperations, error)
+	CountSellers(context.Context, string) (int64, error)
+}
+
+type SellerInfo struct {
+	Status         string
+	CommissionRate int32
+}
+type SellerOperations struct {
+	SellerInfo
+	PickupAddress map[string]any
+}
+
+func sellerDirectory(ctx context.Context) (SellerDirectory, error) {
+	directory, ok := ctx.Value(sellerDirectoryKey{}).(SellerDirectory)
+	if !ok || directory == nil {
+		return nil, ErrUnavailable
+	}
+	return directory, nil
+}
+
+func GetSellerInfo(ctx context.Context, seller uuid.UUID) (SellerInfo, error) {
+	directory, err := sellerDirectory(ctx)
+	if err != nil {
+		return SellerInfo{}, err
+	}
+	return directory.GetSellerInfo(ctx, seller)
+}
+
+func BatchSellerInfo(ctx context.Context, sellers []uuid.UUID) (map[uuid.UUID]SellerInfo, error) {
+	directory, err := sellerDirectory(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return directory.BatchSellerInfo(ctx, sellers)
+}
+
+func GetSellerOperations(ctx context.Context, seller uuid.UUID) (SellerOperations, error) {
+	directory, err := sellerDirectory(ctx)
+	if err != nil {
+		return SellerOperations{}, err
+	}
+	return directory.GetSellerOperations(ctx, seller)
+}
+
+func SellerMembership(ctx context.Context, user, seller uuid.UUID) (string, string, error) {
+	directory, err := sellerDirectory(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return directory.CheckSellerMembership(ctx, user, seller)
+}
+
+func CountSellers(ctx context.Context, status string) (int64, error) {
+	directory, err := sellerDirectory(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return directory.CountSellers(ctx, status)
+}
+
+func WithSellerDirectory(ctx context.Context, directory SellerDirectory) context.Context {
+	return context.WithValue(ctx, sellerDirectoryKey{}, directory)
+}
+
 func New(db *gorm.DB) *Repository { return &Repository{DB: db} }
 func (r *Repository) Within(ctx context.Context, fn func(*Repository) error) error {
 	return r.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(New(tx)) })
@@ -33,12 +103,15 @@ func (r *Repository) Admin(ctx context.Context, user uuid.UUID) error {
 	return nil
 }
 func (r *Repository) Seller(ctx context.Context, user, seller uuid.UUID) error {
-	var n int64
-	err := r.DB.WithContext(ctx).Table("seller.seller_members sm").Joins("JOIN seller.sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, seller).Count(&n).Error
+	directory, err := sellerDirectory(ctx)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
+	role, _, err := directory.CheckSellerMembership(ctx, user, seller)
+	if err != nil {
+		return err
+	}
+	if role != "owner" && role != "manager" && role != "staff" {
 		return ErrForbidden
 	}
 	return nil

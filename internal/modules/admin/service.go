@@ -32,9 +32,11 @@ func (s *Service) Dashboard(ctx context.Context, u uuid.UUID) (Dashboard, error)
 	if err := q.Model(&models.User{}).Where("deleted_at IS NULL").Count(&d.Users).Error; err != nil {
 		return d, err
 	}
-	if err := q.Model(&models.Seller{}).Where("deleted_at IS NULL AND status='pending'").Count(&d.PendingSellers).Error; err != nil {
+	pendingSellers, err := shared.CountSellers(ctx, "pending")
+	if err != nil {
 		return d, err
 	}
+	d.PendingSellers = pendingSellers
 	if err := q.Model(&models.Order{}).Where("deleted_at IS NULL").Count(&d.Orders).Error; err != nil {
 		return d, err
 	}

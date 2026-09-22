@@ -38,12 +38,29 @@ func (r *Repository) CartLines(ctx context.Context, user uuid.UUID, ids []uuid.U
 		return nil, shared.ErrConflict
 	}
 	v := []Line{}
-	err := base.Select("p.seller_id, v.price * ci.quantity AS amount").Joins("JOIN product_variants v ON v.id=ci.variant_id").Joins("JOIN products p ON p.id=v.product_id").Joins("JOIN seller.sellers s ON s.id=p.seller_id").Where("v.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='published' AND s.deleted_at IS NULL AND s.status='approved' AND ci.quantity BETWEEN 1 AND 10000 AND v.price BETWEEN 0 AND 1000000000000 AND v.stock>=ci.quantity").Order("ci.variant_id").Scan(&v).Error
+	err := base.Select("p.seller_id, v.price * ci.quantity AS amount").Joins("JOIN product_variants v ON v.id=ci.variant_id").Joins("JOIN products p ON p.id=v.product_id").Where("v.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='published' AND ci.quantity BETWEEN 1 AND 10000 AND v.price BETWEEN 0 AND 1000000000000 AND v.stock>=ci.quantity").Order("ci.variant_id").Scan(&v).Error
 	if err != nil {
 		return nil, err
 	}
 	if int64(len(v)) != count {
 		return nil, shared.ErrConflict
+	}
+	seen := map[uuid.UUID]bool{}
+	sellerIDs := make([]uuid.UUID, 0, len(v))
+	for _, line := range v {
+		if !seen[line.SellerID] {
+			seen[line.SellerID] = true
+			sellerIDs = append(sellerIDs, line.SellerID)
+		}
+	}
+	shops, err := shared.BatchSellerInfo(ctx, sellerIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range v {
+		if shops[line.SellerID].Status != "approved" {
+			return nil, shared.ErrConflict
+		}
 	}
 	return v, nil
 }
@@ -51,12 +68,11 @@ func (r *Repository) Manage(ctx context.Context, user uuid.UUID, seller *uuid.UU
 	if seller == nil {
 		return shared.New(r.db).Admin(ctx, user)
 	}
-	var n int64
-	err := r.db.WithContext(ctx).Table("seller.seller_members sm").Joins("JOIN seller.sellers s ON s.id=sm.seller_id").Joins("JOIN identity.users u ON u.id=sm.user_id").Where("sm.user_id=? AND sm.seller_id=? AND sm.role IN ('owner','manager') AND s.status='approved' AND s.deleted_at IS NULL AND u.deleted_at IS NULL", user, *seller).Count(&n).Error
+	role, status, err := shared.SellerMembership(ctx, user, *seller)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
+	if (role != "owner" && role != "manager") || status != "approved" {
 		return shared.ErrForbidden
 	}
 	return nil

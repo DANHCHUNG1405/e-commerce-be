@@ -19,8 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SellerService_CheckMembership_FullMethodName = "/ecommerce.seller.v1.SellerService/CheckMembership"
-	SellerService_GetSeller_FullMethodName       = "/ecommerce.seller.v1.SellerService/GetSeller"
+	SellerService_CheckMembership_FullMethodName     = "/ecommerce.seller.v1.SellerService/CheckMembership"
+	SellerService_GetSeller_FullMethodName           = "/ecommerce.seller.v1.SellerService/GetSeller"
+	SellerService_BatchGetSellers_FullMethodName     = "/ecommerce.seller.v1.SellerService/BatchGetSellers"
+	SellerService_GetSellerOperations_FullMethodName = "/ecommerce.seller.v1.SellerService/GetSellerOperations"
+	SellerService_ListMemberships_FullMethodName     = "/ecommerce.seller.v1.SellerService/ListMemberships"
+	SellerService_ListMembers_FullMethodName         = "/ecommerce.seller.v1.SellerService/ListMembers"
+	SellerService_CountSellers_FullMethodName        = "/ecommerce.seller.v1.SellerService/CountSellers"
 )
 
 // SellerServiceClient is the client API for SellerService service.
@@ -29,6 +34,11 @@ const (
 type SellerServiceClient interface {
 	CheckMembership(ctx context.Context, in *CheckMembershipRequest, opts ...grpc.CallOption) (*CheckMembershipResponse, error)
 	GetSeller(ctx context.Context, in *GetSellerRequest, opts ...grpc.CallOption) (*GetSellerResponse, error)
+	BatchGetSellers(ctx context.Context, in *BatchGetSellersRequest, opts ...grpc.CallOption) (*BatchGetSellersResponse, error)
+	GetSellerOperations(ctx context.Context, in *GetSellerOperationsRequest, opts ...grpc.CallOption) (*GetSellerOperationsResponse, error)
+	ListMemberships(ctx context.Context, in *ListMembershipsRequest, opts ...grpc.CallOption) (*ListMembershipsResponse, error)
+	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	CountSellers(ctx context.Context, in *CountSellersRequest, opts ...grpc.CallOption) (*CountSellersResponse, error)
 }
 
 type sellerServiceClient struct {
@@ -59,12 +69,67 @@ func (c *sellerServiceClient) GetSeller(ctx context.Context, in *GetSellerReques
 	return out, nil
 }
 
+func (c *sellerServiceClient) BatchGetSellers(ctx context.Context, in *BatchGetSellersRequest, opts ...grpc.CallOption) (*BatchGetSellersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGetSellersResponse)
+	err := c.cc.Invoke(ctx, SellerService_BatchGetSellers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sellerServiceClient) GetSellerOperations(ctx context.Context, in *GetSellerOperationsRequest, opts ...grpc.CallOption) (*GetSellerOperationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSellerOperationsResponse)
+	err := c.cc.Invoke(ctx, SellerService_GetSellerOperations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sellerServiceClient) ListMemberships(ctx context.Context, in *ListMembershipsRequest, opts ...grpc.CallOption) (*ListMembershipsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMembershipsResponse)
+	err := c.cc.Invoke(ctx, SellerService_ListMemberships_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sellerServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMembersResponse)
+	err := c.cc.Invoke(ctx, SellerService_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sellerServiceClient) CountSellers(ctx context.Context, in *CountSellersRequest, opts ...grpc.CallOption) (*CountSellersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountSellersResponse)
+	err := c.cc.Invoke(ctx, SellerService_CountSellers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SellerServiceServer is the server API for SellerService service.
 // All implementations must embed UnimplementedSellerServiceServer
 // for forward compatibility.
 type SellerServiceServer interface {
 	CheckMembership(context.Context, *CheckMembershipRequest) (*CheckMembershipResponse, error)
 	GetSeller(context.Context, *GetSellerRequest) (*GetSellerResponse, error)
+	BatchGetSellers(context.Context, *BatchGetSellersRequest) (*BatchGetSellersResponse, error)
+	GetSellerOperations(context.Context, *GetSellerOperationsRequest) (*GetSellerOperationsResponse, error)
+	ListMemberships(context.Context, *ListMembershipsRequest) (*ListMembershipsResponse, error)
+	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	CountSellers(context.Context, *CountSellersRequest) (*CountSellersResponse, error)
 	mustEmbedUnimplementedSellerServiceServer()
 }
 
@@ -80,6 +145,21 @@ func (UnimplementedSellerServiceServer) CheckMembership(context.Context, *CheckM
 }
 func (UnimplementedSellerServiceServer) GetSeller(context.Context, *GetSellerRequest) (*GetSellerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSeller not implemented")
+}
+func (UnimplementedSellerServiceServer) BatchGetSellers(context.Context, *BatchGetSellersRequest) (*BatchGetSellersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BatchGetSellers not implemented")
+}
+func (UnimplementedSellerServiceServer) GetSellerOperations(context.Context, *GetSellerOperationsRequest) (*GetSellerOperationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSellerOperations not implemented")
+}
+func (UnimplementedSellerServiceServer) ListMemberships(context.Context, *ListMembershipsRequest) (*ListMembershipsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMemberships not implemented")
+}
+func (UnimplementedSellerServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedSellerServiceServer) CountSellers(context.Context, *CountSellersRequest) (*CountSellersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CountSellers not implemented")
 }
 func (UnimplementedSellerServiceServer) mustEmbedUnimplementedSellerServiceServer() {}
 func (UnimplementedSellerServiceServer) testEmbeddedByValue()                       {}
@@ -138,6 +218,96 @@ func _SellerService_GetSeller_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SellerService_BatchGetSellers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGetSellersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SellerServiceServer).BatchGetSellers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SellerService_BatchGetSellers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SellerServiceServer).BatchGetSellers(ctx, req.(*BatchGetSellersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SellerService_GetSellerOperations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSellerOperationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SellerServiceServer).GetSellerOperations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SellerService_GetSellerOperations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SellerServiceServer).GetSellerOperations(ctx, req.(*GetSellerOperationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SellerService_ListMemberships_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembershipsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SellerServiceServer).ListMemberships(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SellerService_ListMemberships_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SellerServiceServer).ListMemberships(ctx, req.(*ListMembershipsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SellerService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SellerServiceServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SellerService_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SellerServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SellerService_CountSellers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountSellersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SellerServiceServer).CountSellers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SellerService_CountSellers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SellerServiceServer).CountSellers(ctx, req.(*CountSellersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SellerService_ServiceDesc is the grpc.ServiceDesc for SellerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +322,26 @@ var SellerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSeller",
 			Handler:    _SellerService_GetSeller_Handler,
+		},
+		{
+			MethodName: "BatchGetSellers",
+			Handler:    _SellerService_BatchGetSellers_Handler,
+		},
+		{
+			MethodName: "GetSellerOperations",
+			Handler:    _SellerService_GetSellerOperations_Handler,
+		},
+		{
+			MethodName: "ListMemberships",
+			Handler:    _SellerService_ListMemberships_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _SellerService_ListMembers_Handler,
+		},
+		{
+			MethodName: "CountSellers",
+			Handler:    _SellerService_CountSellers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

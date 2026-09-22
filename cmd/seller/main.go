@@ -17,7 +17,6 @@ import (
 	"github.com/example/e-commerce-be/internal/database"
 	sellerv1 "github.com/example/e-commerce-be/internal/gen/seller/v1"
 	"github.com/example/e-commerce-be/internal/grpcseller"
-	"github.com/example/e-commerce-be/internal/grpcutil"
 	"github.com/example/e-commerce-be/internal/http/sellerapi"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -73,7 +72,7 @@ func main() {
 		slog.Error("seller gRPC listener failed", "error", err)
 		os.Exit(1)
 	}
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcutil.UnaryAuth(tokens)))
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcseller.UnaryAuth(tokens)))
 	sellerv1.RegisterSellerServiceServer(grpcServer, grpcseller.NewServer(db))
 	errorsCh := make(chan error, 2)
 	go func() {

@@ -24,6 +24,7 @@ const (
 type CheckMembershipRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SellerId      string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,6 +62,13 @@ func (*CheckMembershipRequest) Descriptor() ([]byte, []int) {
 func (x *CheckMembershipRequest) GetSellerId() string {
 	if x != nil {
 		return x.SellerId
+	}
+	return ""
+}
+
+func (x *CheckMembershipRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
 	}
 	return ""
 }
@@ -162,11 +170,12 @@ func (x *GetSellerRequest) GetSellerId() string {
 }
 
 type GetSellerResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SellerId      string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SellerId       string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	Status         string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	CommissionRate int32                  `protobuf:"varint,3,opt,name=commission_rate,json=commissionRate,proto3" json:"commission_rate,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetSellerResponse) Reset() {
@@ -213,24 +222,602 @@ func (x *GetSellerResponse) GetStatus() string {
 	return ""
 }
 
+func (x *GetSellerResponse) GetCommissionRate() int32 {
+	if x != nil {
+		return x.CommissionRate
+	}
+	return 0
+}
+
+type GetSellerOperationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SellerId      string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSellerOperationsRequest) Reset() {
+	*x = GetSellerOperationsRequest{}
+	mi := &file_seller_v1_seller_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSellerOperationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSellerOperationsRequest) ProtoMessage() {}
+
+func (x *GetSellerOperationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSellerOperationsRequest.ProtoReflect.Descriptor instead.
+func (*GetSellerOperationsRequest) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetSellerOperationsRequest) GetSellerId() string {
+	if x != nil {
+		return x.SellerId
+	}
+	return ""
+}
+
+type GetSellerOperationsResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	SellerId          string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	Status            string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	CommissionRate    int32                  `protobuf:"varint,3,opt,name=commission_rate,json=commissionRate,proto3" json:"commission_rate,omitempty"`
+	PickupAddressJson string                 `protobuf:"bytes,4,opt,name=pickup_address_json,json=pickupAddressJson,proto3" json:"pickup_address_json,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetSellerOperationsResponse) Reset() {
+	*x = GetSellerOperationsResponse{}
+	mi := &file_seller_v1_seller_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSellerOperationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSellerOperationsResponse) ProtoMessage() {}
+
+func (x *GetSellerOperationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSellerOperationsResponse.ProtoReflect.Descriptor instead.
+func (*GetSellerOperationsResponse) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetSellerOperationsResponse) GetSellerId() string {
+	if x != nil {
+		return x.SellerId
+	}
+	return ""
+}
+
+func (x *GetSellerOperationsResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *GetSellerOperationsResponse) GetCommissionRate() int32 {
+	if x != nil {
+		return x.CommissionRate
+	}
+	return 0
+}
+
+func (x *GetSellerOperationsResponse) GetPickupAddressJson() string {
+	if x != nil {
+		return x.PickupAddressJson
+	}
+	return ""
+}
+
+type ListMembershipsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembershipsRequest) Reset() {
+	*x = ListMembershipsRequest{}
+	mi := &file_seller_v1_seller_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembershipsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembershipsRequest) ProtoMessage() {}
+
+func (x *ListMembershipsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembershipsRequest.ProtoReflect.Descriptor instead.
+func (*ListMembershipsRequest) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{6}
+}
+
+type Membership struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SellerId      string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	SellerName    string                 `protobuf:"bytes,2,opt,name=seller_name,json=sellerName,proto3" json:"seller_name,omitempty"`
+	SellerSlug    string                 `protobuf:"bytes,3,opt,name=seller_slug,json=sellerSlug,proto3" json:"seller_slug,omitempty"`
+	SellerStatus  string                 `protobuf:"bytes,4,opt,name=seller_status,json=sellerStatus,proto3" json:"seller_status,omitempty"`
+	Role          string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Membership) Reset() {
+	*x = Membership{}
+	mi := &file_seller_v1_seller_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Membership) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Membership) ProtoMessage() {}
+
+func (x *Membership) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Membership.ProtoReflect.Descriptor instead.
+func (*Membership) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Membership) GetSellerId() string {
+	if x != nil {
+		return x.SellerId
+	}
+	return ""
+}
+
+func (x *Membership) GetSellerName() string {
+	if x != nil {
+		return x.SellerName
+	}
+	return ""
+}
+
+func (x *Membership) GetSellerSlug() string {
+	if x != nil {
+		return x.SellerSlug
+	}
+	return ""
+}
+
+func (x *Membership) GetSellerStatus() string {
+	if x != nil {
+		return x.SellerStatus
+	}
+	return ""
+}
+
+func (x *Membership) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+type ListMembershipsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Memberships   []*Membership          `protobuf:"bytes,1,rep,name=memberships,proto3" json:"memberships,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembershipsResponse) Reset() {
+	*x = ListMembershipsResponse{}
+	mi := &file_seller_v1_seller_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembershipsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembershipsResponse) ProtoMessage() {}
+
+func (x *ListMembershipsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembershipsResponse.ProtoReflect.Descriptor instead.
+func (*ListMembershipsResponse) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListMembershipsResponse) GetMemberships() []*Membership {
+	if x != nil {
+		return x.Memberships
+	}
+	return nil
+}
+
+type ListMembersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SellerId      string                 `protobuf:"bytes,1,opt,name=seller_id,json=sellerId,proto3" json:"seller_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersRequest) Reset() {
+	*x = ListMembersRequest{}
+	mi := &file_seller_v1_seller_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersRequest) ProtoMessage() {}
+
+func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListMembersRequest) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListMembersRequest) GetSellerId() string {
+	if x != nil {
+		return x.SellerId
+	}
+	return ""
+}
+
+type ListMembersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersResponse) Reset() {
+	*x = ListMembersResponse{}
+	mi := &file_seller_v1_seller_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersResponse) ProtoMessage() {}
+
+func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListMembersResponse) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListMembersResponse) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+type BatchGetSellersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SellerIds     []string               `protobuf:"bytes,1,rep,name=seller_ids,json=sellerIds,proto3" json:"seller_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetSellersRequest) Reset() {
+	*x = BatchGetSellersRequest{}
+	mi := &file_seller_v1_seller_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetSellersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetSellersRequest) ProtoMessage() {}
+
+func (x *BatchGetSellersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetSellersRequest.ProtoReflect.Descriptor instead.
+func (*BatchGetSellersRequest) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *BatchGetSellersRequest) GetSellerIds() []string {
+	if x != nil {
+		return x.SellerIds
+	}
+	return nil
+}
+
+type BatchGetSellersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sellers       []*GetSellerResponse   `protobuf:"bytes,1,rep,name=sellers,proto3" json:"sellers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetSellersResponse) Reset() {
+	*x = BatchGetSellersResponse{}
+	mi := &file_seller_v1_seller_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetSellersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetSellersResponse) ProtoMessage() {}
+
+func (x *BatchGetSellersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetSellersResponse.ProtoReflect.Descriptor instead.
+func (*BatchGetSellersResponse) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *BatchGetSellersResponse) GetSellers() []*GetSellerResponse {
+	if x != nil {
+		return x.Sellers
+	}
+	return nil
+}
+
+type CountSellersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountSellersRequest) Reset() {
+	*x = CountSellersRequest{}
+	mi := &file_seller_v1_seller_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountSellersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountSellersRequest) ProtoMessage() {}
+
+func (x *CountSellersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountSellersRequest.ProtoReflect.Descriptor instead.
+func (*CountSellersRequest) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CountSellersRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type CountSellersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Count         int64                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountSellersResponse) Reset() {
+	*x = CountSellersResponse{}
+	mi := &file_seller_v1_seller_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountSellersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountSellersResponse) ProtoMessage() {}
+
+func (x *CountSellersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_seller_v1_seller_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountSellersResponse.ProtoReflect.Descriptor instead.
+func (*CountSellersResponse) Descriptor() ([]byte, []int) {
+	return file_seller_v1_seller_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CountSellersResponse) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 var File_seller_v1_seller_proto protoreflect.FileDescriptor
 
 const file_seller_v1_seller_proto_rawDesc = "" +
 	"\n" +
-	"\x16seller/v1/seller.proto\x12\x13ecommerce.seller.v1\"5\n" +
+	"\x16seller/v1/seller.proto\x12\x13ecommerce.seller.v1\"N\n" +
 	"\x16CheckMembershipRequest\x12\x1b\n" +
-	"\tseller_id\x18\x01 \x01(\tR\bsellerId\"E\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"E\n" +
 	"\x17CheckMembershipResponse\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\"/\n" +
 	"\x10GetSellerRequest\x12\x1b\n" +
-	"\tseller_id\x18\x01 \x01(\tR\bsellerId\"H\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\"q\n" +
 	"\x11GetSellerResponse\x12\x1b\n" +
 	"\tseller_id\x18\x01 \x01(\tR\bsellerId\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status2\xd9\x01\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12'\n" +
+	"\x0fcommission_rate\x18\x03 \x01(\x05R\x0ecommissionRate\"9\n" +
+	"\x1aGetSellerOperationsRequest\x12\x1b\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\"\xab\x01\n" +
+	"\x1bGetSellerOperationsResponse\x12\x1b\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12'\n" +
+	"\x0fcommission_rate\x18\x03 \x01(\x05R\x0ecommissionRate\x12.\n" +
+	"\x13pickup_address_json\x18\x04 \x01(\tR\x11pickupAddressJson\"\x18\n" +
+	"\x16ListMembershipsRequest\"\xa4\x01\n" +
+	"\n" +
+	"Membership\x12\x1b\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\x12\x1f\n" +
+	"\vseller_name\x18\x02 \x01(\tR\n" +
+	"sellerName\x12\x1f\n" +
+	"\vseller_slug\x18\x03 \x01(\tR\n" +
+	"sellerSlug\x12#\n" +
+	"\rseller_status\x18\x04 \x01(\tR\fsellerStatus\x12\x12\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\"\\\n" +
+	"\x17ListMembershipsResponse\x12A\n" +
+	"\vmemberships\x18\x01 \x03(\v2\x1f.ecommerce.seller.v1.MembershipR\vmemberships\"1\n" +
+	"\x12ListMembersRequest\x12\x1b\n" +
+	"\tseller_id\x18\x01 \x01(\tR\bsellerId\"0\n" +
+	"\x13ListMembersResponse\x12\x19\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\"7\n" +
+	"\x16BatchGetSellersRequest\x12\x1d\n" +
+	"\n" +
+	"seller_ids\x18\x01 \x03(\tR\tsellerIds\"[\n" +
+	"\x17BatchGetSellersResponse\x12@\n" +
+	"\asellers\x18\x01 \x03(\v2&.ecommerce.seller.v1.GetSellerResponseR\asellers\"-\n" +
+	"\x13CountSellersRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\",\n" +
+	"\x14CountSellersResponse\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x03R\x05count2\xf6\x05\n" +
 	"\rSellerService\x12l\n" +
 	"\x0fCheckMembership\x12+.ecommerce.seller.v1.CheckMembershipRequest\x1a,.ecommerce.seller.v1.CheckMembershipResponse\x12Z\n" +
-	"\tGetSeller\x12%.ecommerce.seller.v1.GetSellerRequest\x1a&.ecommerce.seller.v1.GetSellerResponseBBZ@github.com/example/e-commerce-be/internal/gen/seller/v1;sellerv1b\x06proto3"
+	"\tGetSeller\x12%.ecommerce.seller.v1.GetSellerRequest\x1a&.ecommerce.seller.v1.GetSellerResponse\x12l\n" +
+	"\x0fBatchGetSellers\x12+.ecommerce.seller.v1.BatchGetSellersRequest\x1a,.ecommerce.seller.v1.BatchGetSellersResponse\x12x\n" +
+	"\x13GetSellerOperations\x12/.ecommerce.seller.v1.GetSellerOperationsRequest\x1a0.ecommerce.seller.v1.GetSellerOperationsResponse\x12l\n" +
+	"\x0fListMemberships\x12+.ecommerce.seller.v1.ListMembershipsRequest\x1a,.ecommerce.seller.v1.ListMembershipsResponse\x12`\n" +
+	"\vListMembers\x12'.ecommerce.seller.v1.ListMembersRequest\x1a(.ecommerce.seller.v1.ListMembersResponse\x12c\n" +
+	"\fCountSellers\x12(.ecommerce.seller.v1.CountSellersRequest\x1a).ecommerce.seller.v1.CountSellersResponseBBZ@github.com/example/e-commerce-be/internal/gen/seller/v1;sellerv1b\x06proto3"
 
 var (
 	file_seller_v1_seller_proto_rawDescOnce sync.Once
@@ -244,23 +831,46 @@ func file_seller_v1_seller_proto_rawDescGZIP() []byte {
 	return file_seller_v1_seller_proto_rawDescData
 }
 
-var file_seller_v1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_seller_v1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_seller_v1_seller_proto_goTypes = []any{
-	(*CheckMembershipRequest)(nil),  // 0: ecommerce.seller.v1.CheckMembershipRequest
-	(*CheckMembershipResponse)(nil), // 1: ecommerce.seller.v1.CheckMembershipResponse
-	(*GetSellerRequest)(nil),        // 2: ecommerce.seller.v1.GetSellerRequest
-	(*GetSellerResponse)(nil),       // 3: ecommerce.seller.v1.GetSellerResponse
+	(*CheckMembershipRequest)(nil),      // 0: ecommerce.seller.v1.CheckMembershipRequest
+	(*CheckMembershipResponse)(nil),     // 1: ecommerce.seller.v1.CheckMembershipResponse
+	(*GetSellerRequest)(nil),            // 2: ecommerce.seller.v1.GetSellerRequest
+	(*GetSellerResponse)(nil),           // 3: ecommerce.seller.v1.GetSellerResponse
+	(*GetSellerOperationsRequest)(nil),  // 4: ecommerce.seller.v1.GetSellerOperationsRequest
+	(*GetSellerOperationsResponse)(nil), // 5: ecommerce.seller.v1.GetSellerOperationsResponse
+	(*ListMembershipsRequest)(nil),      // 6: ecommerce.seller.v1.ListMembershipsRequest
+	(*Membership)(nil),                  // 7: ecommerce.seller.v1.Membership
+	(*ListMembershipsResponse)(nil),     // 8: ecommerce.seller.v1.ListMembershipsResponse
+	(*ListMembersRequest)(nil),          // 9: ecommerce.seller.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),         // 10: ecommerce.seller.v1.ListMembersResponse
+	(*BatchGetSellersRequest)(nil),      // 11: ecommerce.seller.v1.BatchGetSellersRequest
+	(*BatchGetSellersResponse)(nil),     // 12: ecommerce.seller.v1.BatchGetSellersResponse
+	(*CountSellersRequest)(nil),         // 13: ecommerce.seller.v1.CountSellersRequest
+	(*CountSellersResponse)(nil),        // 14: ecommerce.seller.v1.CountSellersResponse
 }
 var file_seller_v1_seller_proto_depIdxs = []int32{
-	0, // 0: ecommerce.seller.v1.SellerService.CheckMembership:input_type -> ecommerce.seller.v1.CheckMembershipRequest
-	2, // 1: ecommerce.seller.v1.SellerService.GetSeller:input_type -> ecommerce.seller.v1.GetSellerRequest
-	1, // 2: ecommerce.seller.v1.SellerService.CheckMembership:output_type -> ecommerce.seller.v1.CheckMembershipResponse
-	3, // 3: ecommerce.seller.v1.SellerService.GetSeller:output_type -> ecommerce.seller.v1.GetSellerResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	7,  // 0: ecommerce.seller.v1.ListMembershipsResponse.memberships:type_name -> ecommerce.seller.v1.Membership
+	3,  // 1: ecommerce.seller.v1.BatchGetSellersResponse.sellers:type_name -> ecommerce.seller.v1.GetSellerResponse
+	0,  // 2: ecommerce.seller.v1.SellerService.CheckMembership:input_type -> ecommerce.seller.v1.CheckMembershipRequest
+	2,  // 3: ecommerce.seller.v1.SellerService.GetSeller:input_type -> ecommerce.seller.v1.GetSellerRequest
+	11, // 4: ecommerce.seller.v1.SellerService.BatchGetSellers:input_type -> ecommerce.seller.v1.BatchGetSellersRequest
+	4,  // 5: ecommerce.seller.v1.SellerService.GetSellerOperations:input_type -> ecommerce.seller.v1.GetSellerOperationsRequest
+	6,  // 6: ecommerce.seller.v1.SellerService.ListMemberships:input_type -> ecommerce.seller.v1.ListMembershipsRequest
+	9,  // 7: ecommerce.seller.v1.SellerService.ListMembers:input_type -> ecommerce.seller.v1.ListMembersRequest
+	13, // 8: ecommerce.seller.v1.SellerService.CountSellers:input_type -> ecommerce.seller.v1.CountSellersRequest
+	1,  // 9: ecommerce.seller.v1.SellerService.CheckMembership:output_type -> ecommerce.seller.v1.CheckMembershipResponse
+	3,  // 10: ecommerce.seller.v1.SellerService.GetSeller:output_type -> ecommerce.seller.v1.GetSellerResponse
+	12, // 11: ecommerce.seller.v1.SellerService.BatchGetSellers:output_type -> ecommerce.seller.v1.BatchGetSellersResponse
+	5,  // 12: ecommerce.seller.v1.SellerService.GetSellerOperations:output_type -> ecommerce.seller.v1.GetSellerOperationsResponse
+	8,  // 13: ecommerce.seller.v1.SellerService.ListMemberships:output_type -> ecommerce.seller.v1.ListMembershipsResponse
+	10, // 14: ecommerce.seller.v1.SellerService.ListMembers:output_type -> ecommerce.seller.v1.ListMembersResponse
+	14, // 15: ecommerce.seller.v1.SellerService.CountSellers:output_type -> ecommerce.seller.v1.CountSellersResponse
+	9,  // [9:16] is the sub-list for method output_type
+	2,  // [2:9] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_seller_v1_seller_proto_init() }
@@ -274,7 +884,7 @@ func file_seller_v1_seller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_seller_v1_seller_proto_rawDesc), len(file_seller_v1_seller_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

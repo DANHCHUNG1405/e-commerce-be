@@ -6,6 +6,7 @@ option go_package = "github.com/example/e-commerce-be/internal/gen/seller/v1;sel
 
 message CheckMembershipRequest {
   string seller_id = 1;
+  string user_id = 2;
 }
 
 message CheckMembershipResponse {
@@ -20,9 +21,40 @@ message GetSellerRequest {
 message GetSellerResponse {
   string seller_id = 1;
   string status = 2;
+  int32 commission_rate = 3;
 }
+message GetSellerOperationsRequest { string seller_id = 1; }
+message GetSellerOperationsResponse {
+  string seller_id = 1;
+  string status = 2;
+  int32 commission_rate = 3;
+  string pickup_address_json = 4;
+}
+
+message ListMembershipsRequest {}
+message Membership {
+  string seller_id = 1;
+  string seller_name = 2;
+  string seller_slug = 3;
+  string seller_status = 4;
+  string role = 5;
+}
+message ListMembershipsResponse { repeated Membership memberships = 1; }
+
+message ListMembersRequest { string seller_id = 1; }
+message ListMembersResponse { repeated string user_ids = 1; }
+
+message BatchGetSellersRequest { repeated string seller_ids = 1; }
+message BatchGetSellersResponse { repeated GetSellerResponse sellers = 1; }
+message CountSellersRequest { string status = 1; }
+message CountSellersResponse { int64 count = 1; }
 
 service SellerService {
   rpc CheckMembership(CheckMembershipRequest) returns (CheckMembershipResponse);
   rpc GetSeller(GetSellerRequest) returns (GetSellerResponse);
+  rpc BatchGetSellers(BatchGetSellersRequest) returns (BatchGetSellersResponse);
+  rpc GetSellerOperations(GetSellerOperationsRequest) returns (GetSellerOperationsResponse);
+  rpc ListMemberships(ListMembershipsRequest) returns (ListMembershipsResponse);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc CountSellers(CountSellersRequest) returns (CountSellersResponse);
 }

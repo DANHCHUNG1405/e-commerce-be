@@ -46,12 +46,15 @@ func (r *ManagementRepository) Role(ctx context.Context, u, id uuid.UUID, lock b
 	if err := q.First(&shop, "id=? AND deleted_at IS NULL", id).Error; err != nil {
 		return "", err
 	}
-	if err := shared.New(r.db).Seller(ctx, u, id); err != nil {
-		return "", err
-	}
 	var m models.SellerMember
-	err := r.db.WithContext(ctx).First(&m, "seller_id=? AND user_id=?", id, u).Error
-	return m.Role, err
+	result := r.db.WithContext(ctx).Table("seller.seller_members sm").Select("sm.*").Joins("JOIN identity.users active_user ON active_user.id=sm.user_id").Where("sm.seller_id=? AND sm.user_id=? AND sm.role IN ('owner','manager','staff') AND active_user.deleted_at IS NULL", id, u).Limit(1).Find(&m)
+	if result.Error != nil {
+		return "", result.Error
+	}
+	if result.RowsAffected == 0 {
+		return "", shared.ErrForbidden
+	}
+	return m.Role, nil
 }
 func (r *ManagementRepository) Update(ctx context.Context, id uuid.UUID, in ShopInput) error {
 	return r.db.WithContext(ctx).Model(&models.Seller{}).Where("id=?", id).Updates(map[string]any{"name": in.Name, "description": in.Description, "pickup_address": gorm.Expr("?::jsonb", in.pickupJSON())}).Error

@@ -14,6 +14,7 @@ import (
 	"github.com/example/e-commerce-be/internal/config"
 	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/grpcchat"
+	"github.com/example/e-commerce-be/internal/grpcseller"
 	httpserver "github.com/example/e-commerce-be/internal/http"
 )
 
@@ -71,7 +72,13 @@ func main() {
 	defer chatConnection.Close()
 
 	tokens := coreauth.NewTokenService(cfg.JWTSecret)
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, mongoClient.Database(cfg.MongoDatabase))
+	sellerConnection, sellerClient, err := grpcseller.Dial(cfg.SellerGRPCTarget)
+	if err != nil {
+		slog.Error("seller gRPC client initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer sellerConnection.Close()
+	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

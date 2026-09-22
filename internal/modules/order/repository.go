@@ -79,6 +79,7 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 			return shared.ErrConflict
 		}
 		lines := []Line{}
+		shops := map[uuid.UUID]shared.SellerInfo{}
 		var total int64
 		for _, item := range items {
 			var v models.ProductVariant
@@ -86,8 +87,20 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 				return err
 			}
 			var p models.Product
-			if err := tx.Where("id=? AND status='published' AND deleted_at IS NULL AND seller_id IN (SELECT id FROM seller.sellers WHERE status='approved' AND deleted_at IS NULL)", v.ProductID).First(&p).Error; err != nil {
+			if err := tx.Where("id=? AND status='published' AND deleted_at IS NULL", v.ProductID).First(&p).Error; err != nil {
 				return err
+			}
+			shop, exists := shops[p.SellerID]
+			if !exists {
+				var err error
+				shop, err = shared.GetSellerInfo(ctx, p.SellerID)
+				if err != nil {
+					return err
+				}
+				shops[p.SellerID] = shop
+			}
+			if shop.Status != "approved" {
+				return gorm.ErrRecordNotFound
 			}
 			if item.Quantity < 1 || item.Quantity > 10000 || v.Stock < item.Quantity || v.Price < 0 || v.Price > 1000000000000 {
 				return shared.ErrConflict
@@ -149,11 +162,8 @@ func (r *Repository) checkout(ctx context.Context, u, address uuid.UUID, key, me
 			}
 		}
 		for _, group := range groups {
-			var seller models.Seller
-			if err := tx.First(&seller, "id=?", group.SellerID).Error; err != nil {
-				return err
-			}
-			group.Commission = group.Total/10000*int64(seller.CommissionRate) + (group.Total%10000)*int64(seller.CommissionRate)/10000
+			commissionRate := int64(shops[group.SellerID].CommissionRate)
+			group.Commission = group.Total/10000*commissionRate + (group.Total%10000)*commissionRate/10000
 			if err := tx.Save(group).Error; err != nil {
 				return err
 			}

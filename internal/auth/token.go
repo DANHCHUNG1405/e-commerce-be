@@ -39,6 +39,13 @@ func (s TokenService) GenerateRefresh(userID uuid.UUID, role string, expiresIn t
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
 }
 
+// GenerateService creates a short-lived credential for internal gRPC calls.
+// It is never accepted by HTTP or user-scoped gRPC interceptors.
+func (s TokenService) GenerateService(service string, expiresIn time.Duration) (string, error) {
+	claims := Claims{Role: service, Type: "service", RegisteredClaims: jwt.RegisteredClaims{Subject: service, ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)), IssuedAt: jwt.NewNumericDate(time.Now())}}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+}
+
 func (s TokenService) Parse(tokenString string) (Claims, error) {
 	var claims Claims
 	_, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (any, error) {

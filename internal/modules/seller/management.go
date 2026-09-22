@@ -109,7 +109,7 @@ func (s *Management) SetMember(ctx context.Context, u, id, target uuid.UUID, rol
 	})
 }
 func (s *Management) Detail(ctx context.Context, u, shop, id uuid.UUID) (OrderDetail, error) {
-	if _, err := s.repo.Role(ctx, u, shop, false); err != nil {
+	if _, _, err := shared.SellerMembership(ctx, u, shop); err != nil {
 		return OrderDetail{}, err
 	}
 	return s.repo.Detail(ctx, shop, id)
@@ -123,13 +123,13 @@ func (s *Management) Orders(ctx context.Context, u, shop uuid.UUID, status strin
 	default:
 		return nil, shared.ErrInvalid
 	}
-	if _, err := s.repo.Role(ctx, u, shop, false); err != nil {
+	if _, _, err := shared.SellerMembership(ctx, u, shop); err != nil {
 		return nil, err
 	}
 	return s.repo.Orders(ctx, shop, status, p, l)
 }
 func (s *Management) Dashboard(ctx context.Context, u, shop uuid.UUID) (Dashboard, error) {
-	role, err := s.repo.Role(ctx, u, shop, false)
+	role, _, err := shared.SellerMembership(ctx, u, shop)
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -165,7 +165,7 @@ func (s *Management) Inventory(ctx context.Context, u, shop, variant uuid.UUID, 
 	if !pages(p, l) {
 		return nil, shared.ErrInvalid
 	}
-	if _, err := s.repo.Role(ctx, u, shop, false); err != nil {
+	if _, _, err := shared.SellerMembership(ctx, u, shop); err != nil {
 		return nil, err
 	}
 	return s.repo.Inventory(ctx, shop, variant, p, l)

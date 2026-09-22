@@ -15,13 +15,13 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) Within(ctx context.Context, fn func(*Repository) error) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(NewRepository(tx)) })
 }
-func (r *Repository) Access(ctx context.Context, user, id uuid.UUID, lock bool) (models.ChatConversation, error) {
+func (r *Repository) Access(ctx context.Context, id uuid.UUID, lock bool) (models.ChatConversation, error) {
 	c := models.ChatConversation{}
 	q := r.db.WithContext(ctx)
 	if lock {
 		q = q.Clauses(clause.Locking{Strength: "UPDATE"})
 	}
-	err := q.Where("id=? AND deleted_at IS NULL AND (buyer_id=? OR seller_id IN (SELECT sm.seller_id FROM seller.seller_members sm JOIN seller.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, user, user).First(&c).Error
+	err := q.Where("id=? AND deleted_at IS NULL", id).First(&c).Error
 	return c, err
 }
 func (r *Repository) Open(ctx context.Context, buyer, seller uuid.UUID) (models.ChatConversation, error) {
@@ -33,9 +33,15 @@ func (r *Repository) Open(ctx context.Context, buyer, seller uuid.UUID) (models.
 	return c, err
 }
 
-func (r *Repository) List(ctx context.Context, user uuid.UUID, page, limit int) ([]models.ChatConversationView, error) {
+func (r *Repository) List(ctx context.Context, user uuid.UUID, sellerIDs []uuid.UUID, page, limit int) ([]models.ChatConversationView, error) {
 	v := []models.ChatConversationView{}
-	err := r.db.WithContext(ctx).Table("chat.chat_conversations c").Select("c.*, COALESCE(cr.last_sequence,0) AS last_read_sequence, (SELECT COUNT(*) FROM chat.chat_messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.sequence>COALESCE(cr.last_sequence,0)) AS unread_count", user).Joins("LEFT JOIN chat.chat_reads cr ON cr.conversation_id=c.id AND cr.user_id=?", user).Where("c.deleted_at IS NULL AND (c.buyer_id=? OR c.seller_id IN (SELECT sm.seller_id FROM seller.seller_members sm JOIN seller.sellers s ON s.id=sm.seller_id WHERE sm.user_id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", user, user).Order("c.updated_at DESC,c.id").Offset((page - 1) * limit).Limit(limit).Scan(&v).Error
+	q := r.db.WithContext(ctx).Table("chat.chat_conversations c").Select("c.*, COALESCE(cr.last_sequence,0) AS last_read_sequence, (SELECT COUNT(*) FROM chat.chat_messages m WHERE m.conversation_id=c.id AND m.sender_id<>? AND m.sequence>COALESCE(cr.last_sequence,0)) AS unread_count", user).Joins("LEFT JOIN chat.chat_reads cr ON cr.conversation_id=c.id AND cr.user_id=?", user).Where("c.deleted_at IS NULL")
+	if len(sellerIDs) == 0 {
+		q = q.Where("c.buyer_id=?", user)
+	} else {
+		q = q.Where("c.buyer_id=? OR c.seller_id IN ?", user, sellerIDs)
+	}
+	err := q.Order("c.updated_at DESC,c.id").Offset((page - 1) * limit).Limit(limit).Scan(&v).Error
 	return v, err
 }
 func (r *Repository) Messages(ctx context.Context, id uuid.UUID, after, before *int64, limit int) ([]models.ChatMessage, error) {
@@ -76,8 +82,14 @@ func (r *Repository) Read(ctx context.Context, v *models.ChatRead) error {
 	}
 	return r.db.WithContext(ctx).Where("conversation_id=? AND user_id=?", v.ConversationID, v.UserID).First(v).Error
 }
-func (r *Repository) Recipients(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
-	v := []uuid.UUID{}
-	err := r.db.WithContext(ctx).Raw("SELECT u.id FROM identity.users u WHERE u.deleted_at IS NULL AND (u.id IN (SELECT buyer_id FROM chat.chat_conversations WHERE id=?) OR u.id IN (SELECT sm.user_id FROM seller.seller_members sm JOIN chat.chat_conversations c ON c.seller_id=sm.seller_id JOIN seller.sellers s ON s.id=sm.seller_id WHERE c.id=? AND sm.role IN ('owner','manager','staff') AND s.deleted_at IS NULL))", id, id).Scan(&v).Error
-	return v, err
+func (r *Repository) RecipientBuyer(ctx context.Context, id uuid.UUID) (uuid.UUID, uuid.UUID, error) {
+	var row struct {
+		BuyerID  *uuid.UUID
+		SellerID uuid.UUID
+	}
+	err := r.db.WithContext(ctx).Table("chat.chat_conversations c").Select("u.id AS buyer_id, c.seller_id").Joins("LEFT JOIN identity.users u ON u.id=c.buyer_id AND u.deleted_at IS NULL").Where("c.id=? AND c.deleted_at IS NULL", id).Take(&row).Error
+	if row.BuyerID == nil {
+		return uuid.Nil, row.SellerID, err
+	}
+	return *row.BuyerID, row.SellerID, err
 }
