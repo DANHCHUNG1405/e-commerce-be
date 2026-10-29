@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
+	"github.com/example/e-commerce-be/internal/outbox"
 	"github.com/google/uuid"
 )
 
@@ -50,12 +51,26 @@ func (s *Service) Create(ctx context.Context, u, item uuid.UUID, rating int, com
 		return v, err
 	}
 	v = models.Review{UserID: u, ProductID: variant.ProductID, OrderItemID: &item, Rating: rating, Comment: comment, Status: "published"}
-	err := s.repo.Create(ctx, &v)
+	err := s.repo.Within(ctx, func(tx *shared.Repository) error {
+		if err := tx.Create(ctx, &v); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "product", v.ProductID, "review_search_updated", map[string]any{"productId": v.ProductID})
+	})
 	return v, err
 }
 func (s *Service) Hide(ctx context.Context, u, id uuid.UUID) error {
 	if err := s.repo.Admin(ctx, u); err != nil {
 		return err
 	}
-	return s.repo.Update(ctx, &models.Review{}, "id=?", []any{id}, map[string]any{"status": "hidden"})
+	return s.repo.Within(ctx, func(tx *shared.Repository) error {
+		var v models.Review
+		if err := tx.One(ctx, &v, "id=? AND deleted_at IS NULL", id); err != nil {
+			return err
+		}
+		if err := tx.Update(ctx, &models.Review{}, "id=?", []any{id}, map[string]any{"status": "hidden"}); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "product", v.ProductID, "review_search_updated", map[string]any{"productId": v.ProductID})
+	})
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	coreauth "github.com/example/e-commerce-be/internal/auth"
+	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/http/api"
 	"github.com/example/e-commerce-be/internal/http/middleware"
@@ -31,6 +32,10 @@ func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *red
 }
 
 func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, metadataDB ...*mongo.Database) *gin.Engine {
+	return NewRouterWithDependencies(db, tokenService, redisClient, sepay, notificationServiceURL, identityServiceURL, sellerServiceURL, sellerClient, nil, metadataDB...)
+}
+
+func NewRouterWithDependencies(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, elasticsearchClient *database.ElasticsearchClient, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -67,11 +72,19 @@ func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redis
 	if len(metadataDB) > 0 && metadataDB[0] != nil {
 		api.MetadataRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), catalog.NewMetadataRepository(metadataDB[0]))
 	}
-	api.Register(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
+	cat := catalog.NewWithSearch(repo, elasticsearchClient, searchMode(elasticsearchClient))
+	api.Register(v1, middleware.RequireAccessToken(tokenService), cat, cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))
 	notificationProxyRoutes(v1, middleware.RequireAccessToken(tokenService), notificationServiceURL)
 	api.AdminRoutes(v1, middleware.RequireAccessToken(tokenService), adminmodule.New(db))
 
 	return router
+}
+
+func searchMode(client *database.ElasticsearchClient) string {
+	if client == nil || client.SearchMode() == "" {
+		return "postgres"
+	}
+	return client.SearchMode()
 }

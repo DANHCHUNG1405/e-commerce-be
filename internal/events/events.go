@@ -10,9 +10,14 @@ import (
 const Topic = "ecommerce.domain-events.v1"
 
 const (
-	OrderCreated       = "order_created"
-	PaymentSucceeded   = "payment_succeeded"
-	OrderStatusChanged = "order_status_changed"
+	OrderCreated         = "order_created"
+	PaymentSucceeded     = "payment_succeeded"
+	OrderStatusChanged   = "order_status_changed"
+	ProductSearchUpdated = "product_search_updated"
+	InventoryChanged     = "inventory_changed"
+	ReviewSearchUpdated  = "review_search_updated"
+	SellerStatusChanged  = "seller_status_changed"
+	SellerSearchUpdated  = "seller_search_updated"
 )
 
 type Envelope struct {

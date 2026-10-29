@@ -11,40 +11,44 @@ import (
 )
 
 type Config struct {
-	SePay                  payment.Config
-	Environment            string
-	Port                   string
-	DatabaseURL            string
-	MongoURL               string
-	MongoDatabase          string
-	RedisURL               string
-	JWTSecret              string
-	NotificationServiceURL string
-	ChatServiceURL         string
-	ChatGRPCTarget         string
-	IdentityServiceURL     string
-	SellerServiceURL       string
-	SellerGRPCTarget       string
+	SePay                   payment.Config
+	Environment             string
+	Port                    string
+	DatabaseURL             string
+	MongoURL                string
+	MongoDatabase           string
+	RedisURL                string
+	ElasticsearchURL        string
+	ElasticsearchSearchMode string
+	JWTSecret               string
+	NotificationServiceURL  string
+	ChatServiceURL          string
+	ChatGRPCTarget          string
+	IdentityServiceURL      string
+	SellerServiceURL        string
+	SellerGRPCTarget        string
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
-		SePay:                  payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
-		Environment:            valueOrDefault("APP_ENV", "development"),
-		Port:                   valueOrDefault("PORT", "8080"),
-		DatabaseURL:            os.Getenv("DATABASE_URL"),
-		MongoURL:               os.Getenv("MONGO_URL"),
-		MongoDatabase:          valueOrDefault("MONGO_DATABASE", "ecommerce"),
-		RedisURL:               os.Getenv("REDIS_URL"),
-		JWTSecret:              os.Getenv("JWT_SECRET"),
-		NotificationServiceURL: valueOrDefault("NOTIFICATION_SERVICE_URL", "http://notification:8082"),
-		ChatServiceURL:         valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
-		ChatGRPCTarget:         valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
-		IdentityServiceURL:     valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
-		SellerServiceURL:       valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
-		SellerGRPCTarget:       valueOrDefault("SELLER_GRPC_TARGET", "seller:9093"),
+		SePay:                   payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
+		Environment:             valueOrDefault("APP_ENV", "development"),
+		Port:                    valueOrDefault("PORT", "8080"),
+		DatabaseURL:             os.Getenv("DATABASE_URL"),
+		MongoURL:                os.Getenv("MONGO_URL"),
+		MongoDatabase:           valueOrDefault("MONGO_DATABASE", "ecommerce"),
+		RedisURL:                os.Getenv("REDIS_URL"),
+		ElasticsearchURL:        valueOrDefault("ELASTICSEARCH_URL", "http://localhost:9200"),
+		ElasticsearchSearchMode: valueOrDefault("ELASTICSEARCH_SEARCH_MODE", "postgres"),
+		JWTSecret:               os.Getenv("JWT_SECRET"),
+		NotificationServiceURL:  valueOrDefault("NOTIFICATION_SERVICE_URL", "http://notification:8082"),
+		ChatServiceURL:          valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
+		ChatGRPCTarget:          valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
+		IdentityServiceURL:      valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
+		SellerServiceURL:        valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
+		SellerGRPCTarget:        valueOrDefault("SELLER_GRPC_TARGET", "seller:9093"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -57,6 +61,13 @@ func Load() (Config, error) {
 	}
 	if cfg.RedisURL == "" {
 		return Config{}, errors.New("REDIS_URL is required")
+	}
+	elasticsearchURL, err := url.Parse(cfg.ElasticsearchURL)
+	if err != nil || (elasticsearchURL.Scheme != "http" && elasticsearchURL.Scheme != "https") || elasticsearchURL.Host == "" || elasticsearchURL.User != nil || elasticsearchURL.RawQuery != "" || elasticsearchURL.Fragment != "" || elasticsearchURL.Path != "" && elasticsearchURL.Path != "/" {
+		return Config{}, errors.New("ELASTICSEARCH_URL must be an absolute HTTP(S) URL without credentials, path, query, or fragment")
+	}
+	if cfg.ElasticsearchSearchMode != "postgres" && cfg.ElasticsearchSearchMode != "shadow" && cfg.ElasticsearchSearchMode != "elasticsearch" {
+		return Config{}, errors.New("ELASTICSEARCH_SEARCH_MODE must be postgres, shadow, or elasticsearch")
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, errors.New("JWT_SECRET is required")

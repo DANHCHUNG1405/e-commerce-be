@@ -3,6 +3,7 @@ package seller
 import (
 	"context"
 	"encoding/json"
+	"github.com/example/e-commerce-be/internal/events"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/outbox"
@@ -71,7 +72,10 @@ func (s *Management) Update(ctx context.Context, u, id uuid.UUID, in ShopInput) 
 		if err := r.Update(ctx, id, in); err != nil {
 			return err
 		}
-		return r.Audit(ctx, u, id, "seller_updated", map[string]any{})
+		if err := r.Audit(ctx, u, id, "seller_updated", map[string]any{}); err != nil {
+			return err
+		}
+		return enqueue(r.db, id, events.SellerSearchUpdated, map[string]any{})
 	})
 }
 func (s *Management) Members(ctx context.Context, u, id uuid.UUID, p, l int) ([]models.SellerMember, error) {

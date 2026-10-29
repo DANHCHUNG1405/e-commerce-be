@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
+	"github.com/example/e-commerce-be/internal/outbox"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"strings"
@@ -32,7 +33,10 @@ func (f Filter) Validate() error {
 		return shared.ErrInvalid
 	}
 	switch f.Sort {
-	case "", "newest", "price_asc", "price_desc", "best_selling", "rating":
+	case "", "newest", "price_asc", "price_desc", "best_selling", "rating", "relevance":
+		if f.Sort == "relevance" && strings.TrimSpace(f.Query) == "" {
+			return shared.ErrInvalid
+		}
 		return nil
 	default:
 		return shared.ErrInvalid
@@ -47,6 +51,9 @@ func (s *Service) Search(ctx context.Context, f Filter, page, limit int) ([]mode
 	}
 	if page < 1 || page > 100000 || limit < 1 || limit > 100 {
 		return nil, shared.ErrInvalid
+	}
+	if s.searchMode == "elasticsearch" || s.searchMode == "shadow" {
+		return s.searchWithES(ctx, f, page, limit)
 	}
 	return (&BrowseRepository{db: s.repo.DB}).Search(ctx, f, page, limit)
 }
@@ -202,12 +209,14 @@ func (r *BrowseRepository) UpdateVariant(ctx context.Context, product, variant u
 	}
 	v := models.ProductVariant{SKU: in.SKU, Name: in.Name, Price: in.Price, Attributes: attributes}
 	// Never update stock here: inventory adjustments require movement history.
-	result := r.db.WithContext(ctx).Model(&models.ProductVariant{}).Where("id=? AND product_id=? AND deleted_at IS NULL", variant, product).Select("SKU", "Name", "Price", "Attributes").Updates(&v)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.ProductVariant{}).Where("id=? AND product_id=? AND deleted_at IS NULL", variant, product).Select("SKU", "Name", "Price", "Attributes").Updates(&v)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return outbox.Enqueue(tx, "product", product, "product_search_updated", map[string]any{})
+	})
 }

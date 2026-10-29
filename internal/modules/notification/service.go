@@ -83,6 +83,35 @@ func recipient(e events.Envelope) (uuid.UUID, string, bool, error) {
 			return uuid.Nil, "", false, ErrInvalidEvent
 		}
 		return p.UserID, p.Status, true, nil
+	case events.ProductSearchUpdated, events.InventoryChanged:
+		var payload map[string]any
+		validAggregate := e.EventType == events.ProductSearchUpdated && e.AggregateType == "product" || e.EventType == events.InventoryChanged && e.AggregateType == "variant"
+		if !validAggregate || len(e.Payload) == 0 || json.Unmarshal(e.Payload, &payload) != nil || payload == nil {
+			return uuid.Nil, "", false, ErrInvalidEvent
+		}
+		if e.EventType == events.InventoryChanged {
+			if _, ok := payload["delta"].(float64); !ok {
+				return uuid.Nil, "", false, ErrInvalidEvent
+			}
+		}
+		return uuid.Nil, "", false, nil
+	case events.ReviewSearchUpdated:
+		var payload struct {
+			ProductID uuid.UUID `json:"productId"`
+		}
+		if e.AggregateType != "product" || json.Unmarshal(e.Payload, &payload) != nil || payload.ProductID == uuid.Nil || payload.ProductID != e.AggregateID {
+			return uuid.Nil, "", false, ErrInvalidEvent
+		}
+		return uuid.Nil, "", false, nil
+	case events.SellerStatusChanged, events.SellerSearchUpdated:
+		var payload struct {
+			Status string `json:"status"`
+		}
+		validPayload := json.Unmarshal(e.Payload, &payload) == nil && (e.EventType == events.SellerSearchUpdated || payload.Status == "approved" || payload.Status == "rejected" || payload.Status == "suspended")
+		if e.AggregateType != "seller" || !validPayload {
+			return uuid.Nil, "", false, ErrInvalidEvent
+		}
+		return uuid.Nil, "", false, nil
 	default:
 		return uuid.Nil, "", false, nil
 	}

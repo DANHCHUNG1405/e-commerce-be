@@ -11,9 +11,41 @@ services:
       IDENTITY_SERVICE_URL: http://identity:8084
       SELLER_SERVICE_URL: http://seller:8085
       SELLER_GRPC_TARGET: seller:9093
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_SEARCH_MODE: ${ELASTICSEARCH_SEARCH_MODE:-postgres}
     depends_on:
       db:
         condition: service_healthy
+  search-indexer:
+    build:
+      context: .
+      args:
+        APP_BINARY: search-indexer
+    env_file: .env
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+  search-reindex:
+    profiles: ["tools"]
+    build:
+      context: .
+      args:
+        APP_BINARY: search-reindex
+    env_file: .env
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
   outbox-relay:
     build:
       context: .
@@ -141,6 +173,22 @@ services:
       timeout: 5s
       retries: 10
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow' >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   kafka:
     image: redpandadata/redpanda:v25.2.1
     command:
@@ -173,3 +221,4 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  elasticsearch_data:

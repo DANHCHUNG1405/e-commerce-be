@@ -2,16 +2,31 @@ package catalog
 
 import (
 	"context"
+	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
+	"github.com/example/e-commerce-be/internal/outbox"
+	"github.com/example/e-commerce-be/internal/productsearch"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"strings"
 )
 
-type Service struct{ repo *shared.Repository }
+type Service struct {
+	repo       *shared.Repository
+	search     productSearch
+	searchMode string
+}
 
 func New(r *shared.Repository) *Service { return &Service{repo: r} }
+
+func NewWithSearch(r *shared.Repository, es *database.ElasticsearchClient, mode string) *Service {
+	s := New(r)
+	if es != nil {
+		s.configureSearch(productsearch.New(es), mode)
+	}
+	return s
+}
 
 type ProductInput struct {
 	Name        string `json:"name" binding:"required,max=200"`
@@ -72,10 +87,21 @@ func (s *Service) Save(ctx context.Context, user, seller, id uuid.UUID, in Produ
 	v.Description = in.Description
 	v.Status = in.Status
 	if id == uuid.Nil {
-		err := s.repo.Create(ctx, &v)
+		err := s.repo.Within(ctx, func(tx *shared.Repository) error {
+			if err := tx.Create(ctx, &v); err != nil {
+				return err
+			}
+			return outbox.Enqueue(tx.DB.WithContext(ctx), "product", v.ID, "product_search_updated", map[string]any{})
+		})
 		return v, err
 	}
-	return v, s.repo.Update(ctx, &models.Product{}, "id=?", []any{id}, map[string]any{"name": v.Name, "slug": v.Slug, "description": v.Description, "status": v.Status})
+	err := s.repo.Within(ctx, func(tx *shared.Repository) error {
+		if err := tx.Update(ctx, &models.Product{}, "id=?", []any{id}, map[string]any{"name": v.Name, "slug": v.Slug, "description": v.Description, "status": v.Status}); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "product", id, "product_search_updated", map[string]any{})
+	})
+	return v, err
 }
 func (s *Service) Variant(ctx context.Context, user, seller, product uuid.UUID, in VariantInput) (models.ProductVariant, error) {
 	v := models.ProductVariant{}
@@ -93,7 +119,12 @@ func (s *Service) Variant(ctx context.Context, user, seller, product uuid.UUID, 
 		in.Attributes = map[string]any{}
 	}
 	v = models.ProductVariant{ProductID: product, SKU: in.SKU, Name: in.Name, Price: in.Price, Attributes: in.Attributes}
-	err := s.repo.Create(ctx, &v)
+	err := s.repo.Within(ctx, func(tx *shared.Repository) error {
+		if err := tx.Create(ctx, &v); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "product", product, "product_search_updated", map[string]any{})
+	})
 	return v, err
 }
 func (s *Service) Categories(ctx context.Context, p, l int) ([]models.Category, error) {

@@ -10,6 +10,11 @@ import (
 )
 
 func Register(v *gin.RouterGroup, auth gin.HandlerFunc, cat *catalog.Service, carts *cart.Service, orders *order.Service) {
+	v.GET("/products/suggestions", func(c *gin.Context) {
+		q := c.Query("q")
+		data, err := cat.Suggestions(c.Request.Context(), q)
+		Reply(c, 200, data, err)
+	})
 	v.GET("/products", func(c *gin.Context) {
 		p, l, ok := Page(c)
 		if !ok {

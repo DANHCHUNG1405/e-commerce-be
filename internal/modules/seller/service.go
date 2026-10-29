@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
+	"github.com/example/e-commerce-be/internal/outbox"
 	"github.com/google/uuid"
 	"strings"
 )
@@ -42,5 +43,10 @@ func (s *Service) Status(ctx context.Context, user, id uuid.UUID, status string)
 	if err := s.repo.Admin(ctx, user); err != nil {
 		return err
 	}
-	return s.repo.Update(ctx, &models.Seller{}, "id=? AND deleted_at IS NULL", []any{id}, map[string]any{"status": status})
+	return s.repo.Within(ctx, func(tx *shared.Repository) error {
+		if err := tx.Update(ctx, &models.Seller{}, "id=? AND deleted_at IS NULL", []any{id}, map[string]any{"status": status}); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "seller", id, "seller_status_changed", map[string]any{"status": status})
+	})
 }

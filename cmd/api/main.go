@@ -55,6 +55,14 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
+	elasticsearchCtx, cancelElasticsearch := context.WithTimeout(context.Background(), 10*time.Second)
+	elasticsearchClient, err := database.ConnectElasticsearch(elasticsearchCtx, cfg.ElasticsearchURL, cfg.ElasticsearchSearchMode)
+	cancelElasticsearch()
+	if err != nil {
+		slog.Error("Elasticsearch configuration failed", "error", err)
+		os.Exit(1)
+	}
+	defer elasticsearchClient.Close()
 
 	redisCtx, cancelRedis := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelRedis()
@@ -78,7 +86,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer sellerConnection.Close()
-	router := httpserver.NewRouterWithPayment(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), mongoClient.Database(cfg.MongoDatabase))
+	router := httpserver.NewRouterWithDependencies(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), elasticsearchClient, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

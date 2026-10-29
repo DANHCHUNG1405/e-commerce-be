@@ -25,7 +25,15 @@ Backend REST API viết bằng Go, Gin, GORM, PostgreSQL và MongoDB.
 2. Chạy PostgreSQL và API bằng `docker compose up --build`.
 3. Kiểm tra API tại `http://localhost:8080/health`, Notification Service tại `http://localhost:8082/health`, Chat Service tại `http://localhost:8083/health`, Identity Service tại `http://localhost:8084/health`, Seller Service tại `http://localhost:8085/health` và readiness tương ứng tại `/ready`.
 
-Để chạy không dùng Docker, cần PostgreSQL, MongoDB và Redis đang chạy (hoặc dùng các URI cloud), đặt `DATABASE_URL`, `MONGO_URL` và `REDIS_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`. Dùng scheme `rediss://` cho Redis TLS.
+Để chạy không dùng Docker, cần PostgreSQL, MongoDB và Redis đang chạy (hoặc dùng các URI cloud), đặt `DATABASE_URL`, `MONGO_URL` và `REDIS_URL` hợp lệ trong `.env`, sau đó dùng `go run ./cmd/api`. Dùng scheme `rediss://` cho Redis TLS. Elasticsearch mặc định kết nối `http://localhost:9200` và không bắt buộc để API khởi động. `ELASTICSEARCH_SEARCH_MODE` nhận `postgres` (mặc định), `shadow` hoặc `elasticsearch`; chế độ Elasticsearch sẽ fallback về PostgreSQL nếu index chưa sẵn sàng hoặc ES gặp lỗi. Khi chạy Compose, service `search-indexer` đồng bộ event; chạy lệnh reindex bên dưới để tạo index mới và chuyển alias.
+
+Tạo lại product index và alias:
+
+```powershell
+docker compose run --rm --build search-reindex
+```
+
+Catalog search keeps the current `GET /api/v1/products` response and filters. It accepts `sort=relevance` when `q` is present. `GET /api/v1/products/suggestions?q=áo` returns at most five product name completions in the standard response envelope. Use `shadow` to compare Elasticsearch product IDs while returning PostgreSQL results; set `elasticsearch` to serve Elasticsearch results with PostgreSQL fallback. Search events are written to the PostgreSQL outbox and consumed asynchronously by `search-indexer`.
 
 ## Cấu trúc
 
