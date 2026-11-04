@@ -24,6 +24,7 @@ type Config struct {
 	NotificationServiceURL  string
 	ChatServiceURL          string
 	ChatGRPCTarget          string
+	AssistantServiceURL     string
 	IdentityServiceURL      string
 	SellerServiceURL        string
 	SellerGRPCTarget        string
@@ -46,6 +47,7 @@ func Load() (Config, error) {
 		NotificationServiceURL:  valueOrDefault("NOTIFICATION_SERVICE_URL", "http://notification:8082"),
 		ChatServiceURL:          valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
 		ChatGRPCTarget:          valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
+		AssistantServiceURL:     valueOrDefault("ASSISTANT_SERVICE_URL", "http://assistant:8086"),
 		IdentityServiceURL:      valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
 		SellerServiceURL:        valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
 		SellerGRPCTarget:        valueOrDefault("SELLER_GRPC_TARGET", "seller:9093"),
@@ -82,6 +84,10 @@ func Load() (Config, error) {
 	}
 	if strings.TrimSpace(cfg.ChatGRPCTarget) == "" {
 		return Config{}, errors.New("CHAT_GRPC_TARGET is required")
+	}
+	assistantURL, err := url.Parse(cfg.AssistantServiceURL)
+	if err != nil || (assistantURL.Scheme != "http" && assistantURL.Scheme != "https") || assistantURL.Host == "" || assistantURL.User != nil || assistantURL.RawQuery != "" || assistantURL.Fragment != "" {
+		return Config{}, errors.New("ASSISTANT_SERVICE_URL must be an absolute HTTP(S) URL")
 	}
 	identityURL, err := url.Parse(cfg.IdentityServiceURL)
 	if err != nil || (identityURL.Scheme != "http" && identityURL.Scheme != "https") || identityURL.Host == "" || identityURL.User != nil || identityURL.RawQuery != "" || identityURL.Fragment != "" {

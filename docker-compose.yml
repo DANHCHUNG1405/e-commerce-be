@@ -8,6 +8,8 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification:8082
       CHAT_SERVICE_URL: http://chat:8083
       CHAT_GRPC_TARGET: chat:9091
+      ASSISTANT_SERVICE_URL: http://assistant:8086
+      GEMINI_API_KEY: ""
       IDENTITY_SERVICE_URL: http://identity:8084
       SELLER_SERVICE_URL: http://seller:8085
       SELLER_GRPC_TARGET: seller:9093
@@ -106,6 +108,31 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8083/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  assistant:
+    build:
+      context: .
+      args:
+        APP_BINARY: assistant
+    env_file: .env
+    environment:
+      ASSISTANT_PORT: "8086"
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      SELLER_GRPC_TARGET: seller:9093
+    expose:
+      - "8086"
+    depends_on:
+      db:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+      seller:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8086/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
