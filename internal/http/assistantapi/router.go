@@ -18,7 +18,7 @@ type Service interface {
 	Create(context.Context, uuid.UUID) (assistant.Conversation, error)
 	List(context.Context, uuid.UUID) ([]assistant.Conversation, error)
 	Messages(context.Context, uuid.UUID, uuid.UUID) ([]assistant.Message, error)
-	Send(context.Context, uuid.UUID, uuid.UUID, string) (assistant.Message, assistant.Message, error)
+	Send(context.Context, uuid.UUID, uuid.UUID, string, *uuid.UUID) (assistant.Message, assistant.Message, *assistant.SuggestedAction, error)
 }
 
 func NewRouter(tokens coreauth.TokenService, service Service, ready func(context.Context) error) *gin.Engine {
@@ -58,13 +58,18 @@ func NewRouter(tokens coreauth.TokenService, service Service, ready func(context
 		}
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8<<10)
 		var in struct {
-			Message string `json:"message" binding:"required"`
+			Message   string     `json:"message" binding:"required"`
+			ProductID *uuid.UUID `json:"productId"`
 		}
 		if c.ShouldBindJSON(&in) != nil {
 			response.Failure(c, http.StatusBadRequest, "invalid request")
 			return
 		}
-		question, answer, err := service.Send(c.Request.Context(), user(c), id, in.Message)
+		if in.ProductID != nil && *in.ProductID == uuid.Nil {
+			response.Failure(c, http.StatusBadRequest, "invalid product id")
+			return
+		}
+		question, answer, suggestedAction, err := service.Send(c.Request.Context(), user(c), id, in.Message, in.ProductID)
 		if errors.Is(err, assistant.ErrInvalid) {
 			response.Failure(c, http.StatusBadRequest, "invalid message")
 			return
@@ -85,7 +90,11 @@ func NewRouter(tokens coreauth.TokenService, service Service, ready func(context
 			response.Failure(c, http.StatusServiceUnavailable, "assistant temporarily unavailable")
 			return
 		}
-		response.Success(c, http.StatusOK, gin.H{"userMessage": question, "assistantMessage": answer})
+		content := gin.H{"userMessage": question, "assistantMessage": answer}
+		if suggestedAction != nil {
+			content["suggestedAction"] = suggestedAction
+		}
+		response.Success(c, http.StatusOK, content)
 	})
 	return router
 }

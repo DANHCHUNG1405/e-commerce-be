@@ -176,7 +176,7 @@ func (s *Service) SellerProducts(ctx context.Context, user, seller uuid.UUID, pa
 }
 
 func (s *Service) SellerDetail(ctx context.Context, user, seller, id uuid.UUID) (Detail, error) {
-	d := Detail{Variants: []models.ProductVariant{}, Images: []models.ProductImage{}}
+	d := Detail{Variants: []models.ProductVariant{}, Images: []models.ProductImage{}, CategoryIDs: []uuid.UUID{}}
 	if err := s.repo.Seller(ctx, user, seller); err != nil {
 		return d, err
 	}
@@ -187,6 +187,9 @@ func (s *Service) SellerDetail(ctx context.Context, user, seller, id uuid.UUID) 
 		return d, err
 	}
 	err := s.repo.List(ctx, &d.Images, "product_id=? AND deleted_at IS NULL", []any{id}, 1, 100)
+	if err == nil {
+		err = s.repo.DB.WithContext(ctx).Table("product_categories").Where("product_id=?", id).Order("category_id").Pluck("category_id", &d.CategoryIDs).Error
+	}
 	return d, err
 }
 func (s *Service) UpdateVariant(ctx context.Context, user, seller, product, variant uuid.UUID, in VariantInput) error {

@@ -166,9 +166,14 @@ func (s *Service) SearchDocument(ctx context.Context, id uuid.UUID) (productsear
 	if err := s.repo.DB.WithContext(ctx).Table("order_items i").Joins("JOIN product_variants v ON v.id=i.variant_id").Joins("JOIN seller_orders so ON so.id=i.seller_order_id").Where("v.product_id=? AND so.status='delivered'", id).Select("COALESCE(SUM(i.quantity),0)").Scan(&doc.Sales).Error; err != nil {
 		return doc, false, err
 	}
-	if err := s.repo.DB.WithContext(ctx).Model(&models.Review{}).Where("product_id=? AND status='published' AND deleted_at IS NULL", id).Select("COALESCE(AVG(rating),0)").Scan(&doc.Rating).Error; err != nil {
+	var rating struct {
+		Rating      float64
+		ReviewCount int64
+	}
+	if err := s.repo.DB.WithContext(ctx).Model(&models.Review{}).Where("product_id=? AND status='published' AND deleted_at IS NULL", id).Select("COALESCE(AVG(rating),0) AS rating, COUNT(*) AS review_count").Scan(&rating).Error; err != nil {
 		return doc, false, err
 	}
+	doc.Rating, doc.ReviewCount = rating.Rating, rating.ReviewCount
 	return doc, true, nil
 }
 

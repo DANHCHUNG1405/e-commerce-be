@@ -34,6 +34,37 @@ type Message struct {
 	Content        string    `json:"content"`
 	CreatedAt      time.Time `json:"createdAt"`
 }
+
+type ProductVariantContext struct {
+	Name       string         `json:"name"`
+	PriceVND   int64          `json:"priceVnd"`
+	Stock      int            `json:"stock"`
+	Attributes map[string]any `json:"attributes,omitempty"`
+}
+
+type ProductContext struct {
+	ID             uuid.UUID               `json:"id"`
+	SellerID       uuid.UUID               `json:"sellerId"`
+	Name           string                  `json:"name"`
+	Description    string                  `json:"description,omitempty"`
+	Variants       []ProductVariantContext `json:"variants,omitempty"`
+	Specifications map[string]any          `json:"specifications,omitempty"`
+}
+
+type SuggestedAction struct {
+	Type             string    `json:"type"`
+	Label            string    `json:"label"`
+	SellerID         uuid.UUID `json:"sellerId"`
+	SuggestedMessage string    `json:"suggestedMessage"`
+}
+
+type Answer struct {
+	Text            string
+	SuggestedAction *SuggestedAction
+}
+
+var ErrProductUnavailable = errors.New("product unavailable to assistant")
+
 type record struct {
 	ID             uuid.UUID `gorm:"column:id"`
 	ConversationID uuid.UUID `gorm:"column:conversation_id"`
@@ -55,7 +86,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type Model interface {
-	Answer(context.Context, uuid.UUID, string) (string, error)
+	Answer(context.Context, uuid.UUID, string, *uuid.UUID) (Answer, error)
 }
 type Service struct {
 	repo    *Repository
@@ -99,31 +130,31 @@ func (s *Service) Messages(ctx context.Context, user, id uuid.UUID) ([]Message, 
 	}
 	return result, err
 }
-func (s *Service) Send(ctx context.Context, user, id uuid.UUID, text string) (Message, Message, error) {
+func (s *Service) Send(ctx context.Context, user, id uuid.UUID, text string, productID *uuid.UUID) (Message, Message, *SuggestedAction, error) {
 	text = strings.TrimSpace(text)
-	if user == uuid.Nil || id == uuid.Nil || text == "" || !utf8.ValidString(text) || utf8.RuneCountInString(text) > 4000 {
-		return Message{}, Message{}, ErrInvalid
+	if user == uuid.Nil || id == uuid.Nil || (productID != nil && *productID == uuid.Nil) || text == "" || !utf8.ValidString(text) || utf8.RuneCountInString(text) > 4000 {
+		return Message{}, Message{}, nil, ErrInvalid
 	}
 	if s.limiter == nil {
-		return Message{}, Message{}, ErrUnavailable
+		return Message{}, Message{}, nil, ErrUnavailable
 	}
 	if err := s.limiter.Allow(ctx, user, 15, time.Minute); err != nil {
-		return Message{}, Message{}, err
+		return Message{}, Message{}, nil, err
 	}
 	var c conversationRow
 	if err := s.repo.db.WithContext(ctx).Table("assistant.conversations").Where("id=? AND user_id=? AND deleted_at IS NULL", id, user).Take(&c).Error; err != nil {
-		return Message{}, Message{}, ErrForbidden
+		return Message{}, Message{}, nil, ErrForbidden
 	}
-	answer, err := s.model.Answer(ctx, user, text)
+	answer, err := s.model.Answer(ctx, user, text, productID)
 	if err != nil {
-		return Message{}, Message{}, err
+		return Message{}, Message{}, nil, err
 	}
-	answer = strings.TrimSpace(answer)
-	if answer == "" || utf8.RuneCountInString(answer) > 12000 {
-		return Message{}, Message{}, errors.New("assistant returned an invalid response")
+	answer.Text = strings.TrimSpace(answer.Text)
+	if answer.Text == "" || utf8.RuneCountInString(answer.Text) > 12000 {
+		return Message{}, Message{}, nil, errors.New("assistant returned an invalid response")
 	}
 	userMessage := record{ID: uuid.New(), ConversationID: id, Sequence: c.LastSequence + 1, Role: "user", Content: text}
-	assistantMessage := record{ID: uuid.New(), ConversationID: id, Sequence: c.LastSequence + 2, Role: "assistant", Content: answer}
+	assistantMessage := record{ID: uuid.New(), ConversationID: id, Sequence: c.LastSequence + 2, Role: "assistant", Content: answer.Text}
 	err = s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		updated := tx.Table("assistant.conversations").Where("id=? AND user_id=? AND last_sequence=? AND deleted_at IS NULL", id, user, c.LastSequence).Updates(map[string]any{"last_sequence": c.LastSequence + 2, "updated_at": time.Now().UTC(), "title": titleFor(c.Title, text)})
 		if updated.Error != nil {
@@ -137,7 +168,7 @@ func (s *Service) Send(ctx context.Context, user, id uuid.UUID, text string) (Me
 		}
 		return tx.Table("assistant.messages").Create(&assistantMessage).Error
 	})
-	return message(userMessage), message(assistantMessage), err
+	return message(userMessage), message(assistantMessage), answer.SuggestedAction, err
 }
 func titleFor(old, text string) string {
 	if old != "" {

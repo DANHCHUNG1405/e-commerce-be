@@ -20,6 +20,7 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func main() {
@@ -55,8 +56,27 @@ func main() {
 		os.Exit(1)
 	}
 	defer redisClient.Close()
+	var metadataRepository *catalog.MetadataRepository
+	var mongoClient *mongo.Client
+	if mongoURL := strings.TrimSpace(os.Getenv("MONGO_URL")); mongoURL != "" {
+		mongoCtx, cancelMongo := context.WithTimeout(context.Background(), 10*time.Second)
+		mongoClient, err = database.ConnectMongo(mongoCtx, mongoURL)
+		cancelMongo()
+		if err != nil {
+			slog.Error("assistant MongoDB connection failed", "error", err)
+			os.Exit(1)
+		}
+		defer func() {
+			disconnectCtx, cancelDisconnect := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelDisconnect()
+			if err := mongoClient.Disconnect(disconnectCtx); err != nil {
+				slog.Error("assistant MongoDB disconnect failed", "error", err)
+			}
+		}()
+		metadataRepository = catalog.NewMetadataRepository(mongoClient.Database(value("MONGO_DATABASE", "ecommerce")))
+	}
 	modelCtx, cancelModel := context.WithTimeout(context.Background(), 10*time.Second)
-	lookup := &supportLookup{catalog: catalog.New(shared.New(db)), orders: order.New(order.NewRepository(db)), sellers: sellerClient, policies: assistant.NewPolicyRepository(db)}
+	lookup := &supportLookup{catalog: catalog.New(shared.New(db)), orders: order.New(order.NewRepository(db)), sellers: sellerClient, policies: assistant.NewPolicyRepository(db), metadata: metadataRepository}
 	model, err := assistant.NewGemini(modelCtx, os.Getenv("GEMINI_API_KEY"), value("GEMINI_MODEL", "gemini-3.8-flash"), lookup)
 	cancelModel()
 	if err != nil {

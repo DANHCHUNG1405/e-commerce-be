@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type supportLookup struct {
@@ -17,12 +19,46 @@ type supportLookup struct {
 	orders   *order.Service
 	sellers  shared.SellerDirectory
 	policies *assistant.PolicyRepository
+	metadata *catalog.MetadataRepository
 }
 
 var _ assistant.Lookup = (*supportLookup)(nil)
 
 func (l *supportLookup) SearchPolicies(ctx context.Context, query string) ([]assistant.PolicyChunk, error) {
 	return l.policies.Search(ctx, query)
+}
+
+func (l *supportLookup) CurrentProduct(ctx context.Context, id uuid.UUID) (assistant.ProductContext, error) {
+	ctx = shared.WithSellerDirectory(ctx, l.sellers)
+	detail, err := l.catalog.Detail(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return assistant.ProductContext{}, assistant.ErrProductUnavailable
+	}
+	if err != nil {
+		return assistant.ProductContext{}, err
+	}
+	product := assistant.ProductContext{
+		ID:          detail.Product.ID,
+		SellerID:    detail.Product.SellerID,
+		Name:        detail.Product.Name,
+		Description: trimText(detail.Product.Description, 3000),
+	}
+	for i, variant := range detail.Variants {
+		if i == 10 {
+			break
+		}
+		product.Variants = append(product.Variants, assistant.ProductVariantContext{
+			Name: variant.Name, PriceVND: variant.Price, Stock: variant.Stock, Attributes: variant.Attributes,
+		})
+	}
+	if l.metadata != nil {
+		metadata, err := l.metadata.Get(ctx, id)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return assistant.ProductContext{}, err
+		}
+		product.Specifications = metadata.Specifications
+	}
+	return product, nil
 }
 
 func (l *supportLookup) SearchProducts(ctx context.Context, query string) (string, error) {

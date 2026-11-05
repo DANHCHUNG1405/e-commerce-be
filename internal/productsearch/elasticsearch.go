@@ -38,6 +38,7 @@ type Document struct {
 	MinPrice    *int64      `json:"min_price,omitempty"`
 	Sales       int64       `json:"sales"`
 	Rating      float64     `json:"rating"`
+	ReviewCount int64       `json:"review_count"`
 	CreatedAt   string      `json:"created_at"`
 	Suggest     []string    `json:"suggest"`
 }
@@ -106,7 +107,7 @@ func Mapping() map[string]any {
 			"description": map[string]any{"type": "text", "analyzer": "vi_folded"}, "sku": map[string]any{"type": "keyword"},
 			"variants":     map[string]any{"type": "nested", "properties": map[string]any{"sku": map[string]any{"type": "keyword"}, "name": map[string]any{"type": "text", "analyzer": "vi_folded"}, "price": map[string]any{"type": "long"}}},
 			"category_ids": map[string]any{"type": "keyword"}, "min_price": map[string]any{"type": "long"}, "sales": map[string]any{"type": "long"},
-			"rating": map[string]any{"type": "double"}, "created_at": map[string]any{"type": "date"},
+			"rating": map[string]any{"type": "double"}, "review_count": map[string]any{"type": "long"}, "created_at": map[string]any{"type": "date"},
 			"suggest": map[string]any{"type": "completion", "analyzer": "vi_prefix", "preserve_separators": true, "preserve_position_increments": false},
 		}},
 	}
@@ -135,6 +136,37 @@ func (c *Client) Search(ctx context.Context, query map[string]any, sort []any, f
 	for _, h := range result.Hits.Hits {
 		if h.Source.ID != uuid.Nil {
 			out = append(out, h.Source.ID)
+		}
+	}
+	return out, nil
+}
+
+// SearchDocuments returns indexed ranking signals for recommendation candidates.
+func (c *Client) SearchDocuments(ctx context.Context, query map[string]any, size int, sortFields ...any) ([]Document, error) {
+	request := map[string]any{"size": size, "query": query, "_source": []string{"id", "seller_id", "name", "description", "category_ids", "sales", "rating", "review_count", "created_at"}}
+	if len(sortFields) > 0 {
+		request["sort"] = sortFields
+	}
+	body, _ := json.Marshal(request)
+	resp, err := c.es.Do(ctx, http.MethodPost, "/"+Alias+"/_search", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source Document `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode recommendation candidates: %w", err)
+	}
+	out := make([]Document, 0, len(result.Hits.Hits))
+	for _, h := range result.Hits.Hits {
+		if h.Source.ID != uuid.Nil {
+			out = append(out, h.Source)
 		}
 	}
 	return out, nil

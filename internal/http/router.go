@@ -15,12 +15,14 @@ import (
 	"github.com/example/e-commerce-be/internal/modules/catalog"
 	"github.com/example/e-commerce-be/internal/modules/order"
 	"github.com/example/e-commerce-be/internal/modules/payment"
+	"github.com/example/e-commerce-be/internal/modules/recommendation"
 	"github.com/example/e-commerce-be/internal/modules/review"
 	"github.com/example/e-commerce-be/internal/modules/seller"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/modules/shipping"
 	"github.com/example/e-commerce-be/internal/modules/voucher"
 	"github.com/example/e-commerce-be/internal/modules/wishlist"
+	"github.com/example/e-commerce-be/internal/productsearch"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -76,6 +78,11 @@ func NewRouterWithDependencies(db *gorm.DB, tokenService coreauth.TokenService, 
 	api.Register(v1, middleware.RequireAccessToken(tokenService), cat, cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))
+	var search *productsearch.Client
+	if elasticsearchClient != nil {
+		search = productsearch.New(elasticsearchClient)
+	}
+	api.RecommendationRoutes(v1, middleware.RequireAccessToken(tokenService), &recommendation.Service{Repo: recommendation.NewRepository(db), Redis: redisClient, Search: search})
 	notificationProxyRoutes(v1, middleware.RequireAccessToken(tokenService), notificationServiceURL)
 	api.AdminRoutes(v1, middleware.RequireAccessToken(tokenService), adminmodule.New(db))
 

@@ -1,5 +1,7 @@
 .env
+staging-tokens.txt
 bin/
 tmp/
 coverage.out
 docs
+.gocache

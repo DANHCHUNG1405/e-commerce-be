@@ -89,6 +89,7 @@ func main() {
 	router := httpserver.NewRouterWithDependencies(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), elasticsearchClient, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	httpserver.AttachAssistantGateway(router, tokens, cfg.AssistantServiceURL)
+	httpserver.AttachBehaviorGateway(router, tokens, cfg.BehaviorServiceURL)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,
