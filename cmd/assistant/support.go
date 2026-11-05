@@ -13,12 +13,17 @@ import (
 )
 
 type supportLookup struct {
-	catalog *catalog.Service
-	orders  *order.Service
-	sellers shared.SellerDirectory
+	catalog  *catalog.Service
+	orders   *order.Service
+	sellers  shared.SellerDirectory
+	policies *assistant.PolicyRepository
 }
 
 var _ assistant.Lookup = (*supportLookup)(nil)
+
+func (l *supportLookup) SearchPolicies(ctx context.Context, query string) ([]assistant.PolicyChunk, error) {
+	return l.policies.Search(ctx, query)
+}
 
 func (l *supportLookup) SearchProducts(ctx context.Context, query string) (string, error) {
 	query = strings.TrimSpace(query)

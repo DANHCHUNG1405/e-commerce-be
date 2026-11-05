@@ -56,7 +56,7 @@ func main() {
 	}
 	defer redisClient.Close()
 	modelCtx, cancelModel := context.WithTimeout(context.Background(), 10*time.Second)
-	lookup := &supportLookup{catalog: catalog.New(shared.New(db)), orders: order.New(order.NewRepository(db)), sellers: sellerClient}
+	lookup := &supportLookup{catalog: catalog.New(shared.New(db)), orders: order.New(order.NewRepository(db)), sellers: sellerClient, policies: assistant.NewPolicyRepository(db)}
 	model, err := assistant.NewGemini(modelCtx, os.Getenv("GEMINI_API_KEY"), value("GEMINI_MODEL", "gemini-3.8-flash"), lookup)
 	cancelModel()
 	if err != nil {
