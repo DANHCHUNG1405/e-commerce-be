@@ -18,6 +18,7 @@ type Config struct {
 	MongoURL                string
 	MongoDatabase           string
 	RedisURL                string
+	KafkaBrokers            string
 	ElasticsearchURL        string
 	ElasticsearchSearchMode string
 	JWTSecret               string
@@ -25,7 +26,6 @@ type Config struct {
 	ChatServiceURL          string
 	ChatGRPCTarget          string
 	AssistantServiceURL     string
-	BehaviorServiceURL      string
 	IdentityServiceURL      string
 	SellerServiceURL        string
 	SellerGRPCTarget        string
@@ -42,6 +42,7 @@ func Load() (Config, error) {
 		MongoURL:                os.Getenv("MONGO_URL"),
 		MongoDatabase:           valueOrDefault("MONGO_DATABASE", "ecommerce"),
 		RedisURL:                os.Getenv("REDIS_URL"),
+		KafkaBrokers:            os.Getenv("KAFKA_BROKERS"),
 		ElasticsearchURL:        valueOrDefault("ELASTICSEARCH_URL", "http://localhost:9200"),
 		ElasticsearchSearchMode: valueOrDefault("ELASTICSEARCH_SEARCH_MODE", "postgres"),
 		JWTSecret:               os.Getenv("JWT_SECRET"),
@@ -49,7 +50,6 @@ func Load() (Config, error) {
 		ChatServiceURL:          valueOrDefault("CHAT_SERVICE_URL", "http://chat:8083"),
 		ChatGRPCTarget:          valueOrDefault("CHAT_GRPC_TARGET", "chat:9091"),
 		AssistantServiceURL:     valueOrDefault("ASSISTANT_SERVICE_URL", "http://assistant:8086"),
-		BehaviorServiceURL:      valueOrDefault("BEHAVIOR_SERVICE_URL", "http://behavior:8087"),
 		IdentityServiceURL:      valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
 		SellerServiceURL:        valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
 		SellerGRPCTarget:        valueOrDefault("SELLER_GRPC_TARGET", "seller:9093"),
@@ -90,10 +90,6 @@ func Load() (Config, error) {
 	assistantURL, err := url.Parse(cfg.AssistantServiceURL)
 	if err != nil || (assistantURL.Scheme != "http" && assistantURL.Scheme != "https") || assistantURL.Host == "" || assistantURL.User != nil || assistantURL.RawQuery != "" || assistantURL.Fragment != "" {
 		return Config{}, errors.New("ASSISTANT_SERVICE_URL must be an absolute HTTP(S) URL")
-	}
-	behaviorURL, err := url.Parse(cfg.BehaviorServiceURL)
-	if err != nil || (behaviorURL.Scheme != "http" && behaviorURL.Scheme != "https") || behaviorURL.Host == "" || behaviorURL.User != nil || behaviorURL.RawQuery != "" || behaviorURL.Fragment != "" {
-		return Config{}, errors.New("BEHAVIOR_SERVICE_URL must be an absolute HTTP(S) URL")
 	}
 	identityURL, err := url.Parse(cfg.IdentityServiceURL)
 	if err != nil || (identityURL.Scheme != "http" && identityURL.Scheme != "https") || identityURL.Host == "" || identityURL.User != nil || identityURL.RawQuery != "" || identityURL.Fragment != "" {

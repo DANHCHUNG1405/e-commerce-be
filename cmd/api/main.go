@@ -16,6 +16,7 @@ import (
 	"github.com/example/e-commerce-be/internal/grpcchat"
 	"github.com/example/e-commerce-be/internal/grpcseller"
 	httpserver "github.com/example/e-commerce-be/internal/http"
+	"github.com/example/e-commerce-be/internal/modules/recommendation"
 )
 
 func main() {
@@ -89,7 +90,13 @@ func main() {
 	router := httpserver.NewRouterWithDependencies(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), elasticsearchClient, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	httpserver.AttachAssistantGateway(router, tokens, cfg.AssistantServiceURL)
-	httpserver.AttachBehaviorGateway(router, tokens, cfg.BehaviorServiceURL)
+	var collector *recommendation.Collector
+	if len(recommendation.BrokerAddresses(cfg.KafkaBrokers)) > 0 {
+		behaviorWriter := recommendation.NewWriter(cfg.KafkaBrokers, recommendation.RawTopic)
+		defer behaviorWriter.Close()
+		collector = &recommendation.Collector{Writer: behaviorWriter, Redis: redisClient}
+	}
+	httpserver.AttachBehaviorCollector(router, tokens, collector)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,
