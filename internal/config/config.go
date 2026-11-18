@@ -128,12 +128,16 @@ func Load() (Config, error) {
 }
 
 func loadDotEnv() error {
-	values, err := godotenv.Read()
+	contents, err := os.ReadFile(".env")
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return fmt.Errorf("read .env: %w", err)
+	}
+	values, err := godotenv.Unmarshal(strings.TrimPrefix(string(contents), "\uFEFF"))
+	if err != nil {
+		return fmt.Errorf("parse .env: %w", err)
 	}
 	for key, value := range values {
 		current, exists := os.LookupEnv(key)
