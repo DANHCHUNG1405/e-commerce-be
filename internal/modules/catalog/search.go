@@ -186,7 +186,13 @@ func (s *Service) IndexProduct(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if !ok {
-		return s.search.Delete(ctx, id)
+		if err := s.search.Delete(ctx, id); err != nil {
+			return err
+		}
+		return s.IndexProductImages(ctx, id)
 	}
-	return s.search.Index(ctx, doc)
+	if err := s.search.Index(ctx, doc); err != nil {
+		return err
+	}
+	return s.IndexProductImages(ctx, id)
 }

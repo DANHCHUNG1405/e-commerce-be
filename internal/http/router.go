@@ -10,6 +10,7 @@ import (
 	"github.com/example/e-commerce-be/internal/grpcseller"
 	"github.com/example/e-commerce-be/internal/http/api"
 	"github.com/example/e-commerce-be/internal/http/middleware"
+	"github.com/example/e-commerce-be/internal/imagevector"
 	adminmodule "github.com/example/e-commerce-be/internal/modules/admin"
 	"github.com/example/e-commerce-be/internal/modules/cart"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
@@ -34,10 +35,10 @@ func NewRouter(db *gorm.DB, tokenService coreauth.TokenService, redisClient *red
 }
 
 func NewRouterWithPayment(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, metadataDB ...*mongo.Database) *gin.Engine {
-	return NewRouterWithDependencies(db, tokenService, redisClient, sepay, notificationServiceURL, identityServiceURL, sellerServiceURL, sellerClient, nil, metadataDB...)
+	return NewRouterWithDependencies(db, tokenService, redisClient, sepay, notificationServiceURL, identityServiceURL, sellerServiceURL, sellerClient, nil, "", "http://clip:8090", false, metadataDB...)
 }
 
-func NewRouterWithDependencies(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, elasticsearchClient *database.ElasticsearchClient, metadataDB ...*mongo.Database) *gin.Engine {
+func NewRouterWithDependencies(db *gorm.DB, tokenService coreauth.TokenService, redisClient *redis.Client, sepay payment.Config, notificationServiceURL, identityServiceURL, sellerServiceURL string, sellerClient *grpcseller.Client, elasticsearchClient *database.ElasticsearchClient, imageKitEndpoint, clipServiceURL string, imageSearchEnabled bool, metadataDB ...*mongo.Database) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), middleware.Recovery())
 	router.HandleMethodNotAllowed = true
@@ -70,11 +71,14 @@ func NewRouterWithDependencies(db *gorm.DB, tokenService coreauth.TokenService, 
 	api.DeliveryRoutes(v1, middleware.RequireAccessToken(tokenService), shipping.New(shipping.NewRepository(db)))
 	api.SellerCrossDomainRoutes(v1, middleware.RequireAccessToken(tokenService), seller.NewManagement(seller.NewManagementRepository(db)))
 	api.VoucherRoutes(v1, middleware.RequireAccessToken(tokenService), voucher.New(voucher.NewRepository(db)))
-	api.CatalogRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo))
+	cat := catalog.NewWithSearch(repo, elasticsearchClient, searchMode(elasticsearchClient))
+	if imageSearchEnabled && elasticsearchClient != nil {
+		cat.SetImageSearch(imagevector.New(elasticsearchClient, clipServiceURL), imageKitEndpoint)
+	}
+	api.CatalogRoutes(v1, middleware.RequireAccessToken(tokenService), cat, imageKitEndpoint)
 	if len(metadataDB) > 0 && metadataDB[0] != nil {
 		api.MetadataRoutes(v1, middleware.RequireAccessToken(tokenService), catalog.New(repo), catalog.NewMetadataRepository(metadataDB[0]))
 	}
-	cat := catalog.NewWithSearch(repo, elasticsearchClient, searchMode(elasticsearchClient))
 	api.Register(v1, middleware.RequireAccessToken(tokenService), cat, cart.New(cart.NewRepository(db)), order.New(order.NewRepository(db), sepay))
 	api.PaymentRoutes(v1, middleware.RequireAccessToken(tokenService), payment.New(payment.NewRepository(db), sepay), sepay)
 	api.Commerce(v1, middleware.RequireAccessToken(tokenService), order.New(order.NewRepository(db)), review.New(repo), wishlist.New(db))

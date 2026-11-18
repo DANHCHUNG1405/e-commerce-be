@@ -2,23 +2,211 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"github.com/example/e-commerce-be/internal/database"
+	"github.com/example/e-commerce-be/internal/imagevector"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/shared"
 	"github.com/example/e-commerce-be/internal/outbox"
 	"github.com/example/e-commerce-be/internal/productsearch"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
 
 type Service struct {
-	repo       *shared.Repository
-	search     productSearch
-	searchMode string
+	repo             *shared.Repository
+	search           productSearch
+	searchMode       string
+	imageKitEndpoint string
+	imageVectors     *imagevector.Client
 }
 
 func New(r *shared.Repository) *Service { return &Service{repo: r} }
+
+func (s *Service) SetImageKitEndpoint(endpoint string) {
+	s.imageKitEndpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+}
+
+func (s *Service) SetImageSearch(client *imagevector.Client, endpoint string) {
+	s.imageVectors = client
+	s.SetImageKitEndpoint(endpoint)
+}
+
+func (s *Service) SearchByImage(ctx context.Context, data []byte, contentType string, page, limit int) ([]models.Product, error) {
+	if s.imageVectors == nil || page < 1 || limit < 1 || limit > 100 {
+		return nil, shared.ErrUnavailable
+	}
+	started := time.Now()
+	vector, model, err := s.imageVectors.Embed(ctx, data, contentType)
+	if err != nil {
+		return nil, fmt.Errorf("create query image embedding: %w", err)
+	}
+	k := min(page*limit*5, 500)
+	ids, err := s.imageVectors.Search(ctx, vector, model, k)
+	if err != nil {
+		return nil, fmt.Errorf("search image vectors: %w", err)
+	}
+	products, err := s.hydrateSearchIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	start := (page - 1) * limit
+	if start >= len(products) {
+		return []models.Product{}, nil
+	}
+	end := min(start+limit, len(products))
+	slog.Info("catalog image search completed", "total_ms", time.Since(started).Milliseconds(), "candidate_count", len(ids), "result_count", end-start)
+	return products[start:end], nil
+}
+
+func (s *Service) IndexProductImages(ctx context.Context, product uuid.UUID) error {
+	if s.imageVectors == nil {
+		return nil
+	}
+	ready, err := s.imageVectors.AliasExists(ctx)
+	if err != nil {
+		return err
+	}
+	if !ready {
+		return nil
+	}
+	return s.IndexProductImagesTo(ctx, product, imagevector.Alias)
+}
+
+func (s *Service) IndexProductImagesTo(ctx context.Context, product uuid.UUID, target string) error {
+	if s.imageVectors == nil {
+		return nil
+	}
+	_, ok, err := s.SearchDocument(ctx, product)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return s.imageVectors.DeleteProductFrom(ctx, target, product)
+	}
+	var images []models.ProductImage
+	if err := s.repo.DB.WithContext(ctx).Where("product_id=? AND deleted_at IS NULL", product).Order("sort_order,id").Find(&images).Error; err != nil {
+		return err
+	}
+	if err := s.imageVectors.DeleteProductFrom(ctx, target, product); err != nil {
+		return err
+	}
+	indexed := 0
+	for _, image := range images {
+		if !validImageKitProductURL(image.URL, s.imageKitEndpoint, product) {
+			slog.Warn("skip product image outside ImageKit product folder", "productId", product, "imageId", image.ID)
+			continue
+		}
+		data, contentType, err := s.downloadImageKitImage(ctx, product, image.URL)
+		if err != nil {
+			return fmt.Errorf("download product image %s: %w", image.ID, err)
+		}
+		vector, model, err := s.imageVectors.Embed(ctx, data, contentType)
+		if err != nil {
+			return fmt.Errorf("embed product image %s: %w", image.ID, err)
+		}
+		if err := s.imageVectors.Index(ctx, target, product, image.ID, model, vector); err != nil {
+			return fmt.Errorf("index product image %s: %w", image.ID, err)
+		}
+		indexed++
+	}
+	slog.Info("product image vectors indexed", "productId", product, "vector_count", indexed)
+	return nil
+}
+
+func (s *Service) downloadImageKitImage(ctx context.Context, product uuid.UUID, rawURL string) ([]byte, string, error) {
+	base, _ := url.Parse(s.imageKitEndpoint)
+	u, err := url.Parse(rawURL)
+	if err != nil || base == nil || u.Scheme != "https" || !strings.EqualFold(u.Host, base.Host) || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return nil, "", shared.ErrInvalid
+	}
+	prefix := strings.TrimRight(base.Path, "/") + "/products/" + product.String() + "/"
+	if !strings.HasPrefix(u.Path, prefix) || strings.Contains(strings.TrimPrefix(u.Path, prefix), "/") || strings.TrimPrefix(u.Path, prefix) == "" {
+		return nil, "", shared.ErrInvalid
+	}
+	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.ContentLength > 10<<20 {
+		return nil, "", fmt.Errorf("image host returned invalid response")
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, (10<<20)+1))
+	if err != nil {
+		return nil, "", err
+	}
+	if len(data) == 0 || len(data) > 10<<20 {
+		return nil, "", fmt.Errorf("image size is invalid")
+	}
+	contentType := http.DetectContentType(data)
+	if len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
+		contentType = "image/webp"
+	}
+	return data, contentType, nil
+}
+
+func (s *Service) AddImage(ctx context.Context, user, seller, product uuid.UUID, rawURL string) (models.ProductImage, error) {
+	image := models.ProductImage{}
+	if !validImageKitProductURL(rawURL, s.imageKitEndpoint, product) {
+		return image, shared.ErrInvalid
+	}
+	if err := s.repo.Seller(ctx, user, seller); err != nil {
+		return image, err
+	}
+	image.ProductID = product
+	image.URL = rawURL
+	err := s.repo.Within(ctx, func(tx *shared.Repository) error {
+		var owned models.Product
+		if err := tx.DB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=? AND seller_id=? AND deleted_at IS NULL", product, seller).First(&owned).Error; err != nil {
+			return err
+		}
+		var maxSort *int
+		if err := tx.DB.WithContext(ctx).Model(&models.ProductImage{}).Where("product_id=? AND deleted_at IS NULL", product).Select("MAX(sort_order)").Scan(&maxSort).Error; err != nil {
+			return err
+		}
+		if maxSort != nil {
+			image.SortOrder = *maxSort + 1
+		}
+		if err := tx.Create(ctx, &image); err != nil {
+			return err
+		}
+		return outbox.Enqueue(tx.DB.WithContext(ctx), "product", product, "product_search_updated", map[string]any{"productId": product, "imageId": image.ID})
+	})
+	return image, err
+}
+
+func validImageKitProductURL(rawURL, endpoint string, product uuid.UUID) bool {
+	if endpoint == "" {
+		return false
+	}
+	base, err := url.Parse(endpoint)
+	if err != nil {
+		return false
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" {
+		return false
+	}
+	if !strings.EqualFold(u.Host, base.Host) || u.Scheme != base.Scheme {
+		return false
+	}
+	basePath := strings.TrimRight(base.Path, "/")
+	prefix := fmt.Sprintf("%s/products/%s/", basePath, product.String())
+	return strings.HasPrefix(u.Path, prefix) && len(strings.TrimPrefix(u.Path, prefix)) > 0 && !strings.Contains(strings.TrimPrefix(u.Path, prefix), "/")
+}
 
 func NewWithSearch(r *shared.Repository, es *database.ElasticsearchClient, mode string) *Service {
 	s := New(r)

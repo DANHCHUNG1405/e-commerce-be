@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"github.com/example/e-commerce-be/internal/modules/payment"
 	"net/url"
 	"os"
@@ -29,10 +30,15 @@ type Config struct {
 	IdentityServiceURL      string
 	SellerServiceURL        string
 	SellerGRPCTarget        string
+	ImageKitURLEndpoint     string
+	ImageSearchEnabled      bool
+	CLIPServiceURL          string
 }
 
 func Load() (Config, error) {
-	_ = godotenv.Load()
+	if err := loadDotEnv(); err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		SePay:                   payment.Config{Bank: os.Getenv("SEPAY_BANK"), Account: os.Getenv("SEPAY_ACCOUNT_NUMBER"), WebhookSecret: os.Getenv("SEPAY_WEBHOOK_SECRET")},
@@ -53,6 +59,9 @@ func Load() (Config, error) {
 		IdentityServiceURL:      valueOrDefault("IDENTITY_SERVICE_URL", "http://identity:8084"),
 		SellerServiceURL:        valueOrDefault("SELLER_SERVICE_URL", "http://seller:8085"),
 		SellerGRPCTarget:        valueOrDefault("SELLER_GRPC_TARGET", "seller:9093"),
+		ImageKitURLEndpoint:     strings.TrimRight(strings.TrimSpace(os.Getenv("IMAGEKIT_URL_ENDPOINT")), "/"),
+		ImageSearchEnabled:      strings.EqualFold(os.Getenv("IMAGE_SEARCH_ENABLED"), "true"),
+		CLIPServiceURL:          valueOrDefault("CLIP_SERVICE_URL", "http://clip:8090"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -102,7 +111,39 @@ func Load() (Config, error) {
 	if strings.TrimSpace(cfg.SellerGRPCTarget) == "" {
 		return Config{}, errors.New("SELLER_GRPC_TARGET is required")
 	}
+	if cfg.ImageKitURLEndpoint != "" {
+		imageKitURL, parseErr := url.Parse(cfg.ImageKitURLEndpoint)
+		if parseErr != nil || imageKitURL.Scheme != "https" || imageKitURL.Host == "" || imageKitURL.User != nil || imageKitURL.RawQuery != "" || imageKitURL.Fragment != "" {
+			return Config{}, errors.New("IMAGEKIT_URL_ENDPOINT must be an absolute HTTPS URL without credentials, query, or fragment")
+		}
+	}
+	clipURL, err := url.Parse(cfg.CLIPServiceURL)
+	if err != nil || (clipURL.Scheme != "http" && clipURL.Scheme != "https") || clipURL.Host == "" || clipURL.User != nil || clipURL.RawQuery != "" || clipURL.Fragment != "" {
+		return Config{}, errors.New("CLIP_SERVICE_URL must be an absolute HTTP(S) URL")
+	}
+	if cfg.ImageSearchEnabled && cfg.ImageKitURLEndpoint == "" {
+		return Config{}, errors.New("image search requires IMAGEKIT_URL_ENDPOINT")
+	}
 	return cfg, nil
+}
+
+func loadDotEnv() error {
+	values, err := godotenv.Read()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read .env: %w", err)
+	}
+	for key, value := range values {
+		current, exists := os.LookupEnv(key)
+		if !exists || current == "" {
+			if err := os.Setenv(key, value); err != nil {
+				return fmt.Errorf("set environment variable %s from .env: %w", key, err)
+			}
+		}
+	}
+	return nil
 }
 
 func valueOrDefault(key, fallback string) string {

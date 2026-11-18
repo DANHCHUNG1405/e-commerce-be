@@ -9,6 +9,7 @@ import (
 
 	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/events"
+	"github.com/example/e-commerce-be/internal/imagevector"
 	"github.com/example/e-commerce-be/internal/kafka"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
 	"github.com/example/e-commerce-be/internal/modules/shared"
@@ -43,6 +44,9 @@ func main() {
 	reader := kafka.NewReader(brokers, events.Topic, "search-indexer")
 	defer reader.Close()
 	service := catalog.NewWithSearch(shared.New(db), es, "elasticsearch")
+	if value("IMAGE_SEARCH_ENABLED", "false") == "true" {
+		service.SetImageSearch(imagevector.New(es, value("CLIP_SERVICE_URL", "http://clip:8090")), os.Getenv("IMAGEKIT_URL_ENDPOINT"))
+	}
 	slog.Info("search indexer started", "group", "search-indexer", "topic", events.Topic)
 	if err := searchindexer.New(db, reader, service).Run(ctx); err != nil {
 		slog.Error("search indexer stopped", "error", err)

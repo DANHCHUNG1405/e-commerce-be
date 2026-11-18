@@ -87,7 +87,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer sellerConnection.Close()
-	router := httpserver.NewRouterWithDependencies(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), elasticsearchClient, mongoClient.Database(cfg.MongoDatabase))
+	router := httpserver.NewRouterWithDependencies(db, tokens, redisClient, cfg.SePay, cfg.NotificationServiceURL, cfg.IdentityServiceURL, cfg.SellerServiceURL, sellerClient.WithServiceIdentity(tokens, "api"), elasticsearchClient, cfg.ImageKitURLEndpoint, cfg.CLIPServiceURL, cfg.ImageSearchEnabled, mongoClient.Database(cfg.MongoDatabase))
 	httpserver.AttachChatGateway(router, tokens, chatClient, cfg.ChatServiceURL)
 	httpserver.AttachAssistantGateway(router, tokens, cfg.AssistantServiceURL)
 	var collector *recommendation.Collector

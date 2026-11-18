@@ -10,6 +10,7 @@ import (
 
 	"github.com/example/e-commerce-be/internal/database"
 	"github.com/example/e-commerce-be/internal/events"
+	"github.com/example/e-commerce-be/internal/imagevector"
 	"github.com/example/e-commerce-be/internal/models"
 	"github.com/example/e-commerce-be/internal/modules/catalog"
 	"github.com/example/e-commerce-be/internal/modules/shared"
@@ -46,6 +47,21 @@ func main() {
 		os.Exit(1)
 	}
 	service := catalog.NewWithSearch(shared.New(db), es, "elasticsearch")
+	imageSearchEnabled := value("IMAGE_SEARCH_ENABLED", "false") == "true"
+	imageClient := imagevector.New(es, value("CLIP_SERVICE_URL", "http://clip:8090"))
+	imageIndex := ""
+	if imageSearchEnabled {
+		if os.Getenv("IMAGEKIT_URL_ENDPOINT") == "" {
+			slog.Error("IMAGEKIT_URL_ENDPOINT is required for image reindex")
+			os.Exit(1)
+		}
+		service.SetImageSearch(imageClient, os.Getenv("IMAGEKIT_URL_ENDPOINT"))
+		imageIndex = fmt.Sprintf("product-images-%s-%s", time.Now().UTC().Format("20060102t150405"), uuid.NewString()[:8])
+		if err := imageClient.EnsureIndex(ctx, imageIndex); err != nil {
+			slog.Error("create versioned image index failed", "error", err)
+			os.Exit(1)
+		}
+	}
 	var cursor uuid.UUID
 	count := 0
 	for {
@@ -74,12 +90,24 @@ func main() {
 				}
 				count++
 			}
+			if imageSearchEnabled {
+				if err := service.IndexProductImagesTo(ctx, id, imageIndex); err != nil {
+					slog.Error("index product images failed", "productId", id, "error", err)
+					os.Exit(1)
+				}
+			}
 		}
 		cursor = ids[len(ids)-1]
 	}
 	if err := client.SetAlias(ctx, index); err != nil {
 		slog.Error("switch product search alias failed", "error", err)
 		os.Exit(1)
+	}
+	if imageSearchEnabled {
+		if err := imageClient.SetAlias(ctx, imageIndex); err != nil {
+			slog.Error("switch image search alias failed", "error", err)
+			os.Exit(1)
+		}
 	}
 	if err := replaySearchEvents(ctx, db, service, snapshotStarted); err != nil {
 		slog.Error("replay product changes after reindex failed", "error", err)

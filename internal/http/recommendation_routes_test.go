@@ -11,7 +11,7 @@ import (
 
 func TestRecommendationRoutesRegisterWithMarketplace(t *testing.T) {
 	tokens := coreauth.NewTokenService("test-only-secret")
-	router := NewRouterWithDependencies(nil, tokens, nil, payment.Config{}, "", "", "", nil, nil)
+	router := NewRouterWithDependencies(nil, tokens, nil, payment.Config{}, "", "", "", nil, nil, "", "http://clip:8090", false)
 	AttachBehaviorCollector(router, tokens, nil)
 	routes := []struct{ method, path string }{
 		{http.MethodGet, "/api/v1/recommendations/home"},

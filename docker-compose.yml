@@ -16,8 +16,12 @@ services:
       SELLER_GRPC_TARGET: seller:9093
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ELASTICSEARCH_SEARCH_MODE: ${ELASTICSEARCH_SEARCH_MODE:-postgres}
+      IMAGE_SEARCH_ENABLED: ${IMAGE_SEARCH_ENABLED:-false}
+      CLIP_SERVICE_URL: http://clip:8090
     depends_on:
       db:
+        condition: service_healthy
+      clip:
         condition: service_healthy
   search-indexer:
     build:
@@ -28,6 +32,8 @@ services:
     environment:
       KAFKA_BROKERS: kafka:9092
       ELASTICSEARCH_URL: http://elasticsearch:9200
+      IMAGE_SEARCH_ENABLED: ${IMAGE_SEARCH_ENABLED:-false}
+      CLIP_SERVICE_URL: http://clip:8090
     depends_on:
       db:
         condition: service_healthy
@@ -35,6 +41,22 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_started
+      clip:
+        condition: service_healthy
+  clip:
+    build: ./clip-service
+    environment:
+      IMAGE_SEARCH_ENABLED: ${IMAGE_SEARCH_ENABLED:-false}
+    expose:
+      - "8090"
+    volumes:
+      - clip_model_cache:/model-cache
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5m
   search-reindex:
     profiles: ["tools"]
     build:
@@ -44,11 +66,15 @@ services:
     env_file: .env
     environment:
       ELASTICSEARCH_URL: http://elasticsearch:9200
+      IMAGE_SEARCH_ENABLED: ${IMAGE_SEARCH_ENABLED:-false}
+      CLIP_SERVICE_URL: http://clip:8090
     depends_on:
       db:
         condition: service_healthy
       elasticsearch:
         condition: service_started
+      clip:
+        condition: service_healthy
   outbox-relay:
     build:
       context: .
@@ -294,3 +320,4 @@ volumes:
   kafka_data:
   elasticsearch_data:
   clickhouse_data:
+  clip_model_cache:

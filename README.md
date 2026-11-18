@@ -39,6 +39,8 @@ docker compose run --rm --build search-reindex
 
 Catalog search keeps the current `GET /api/v1/products` response and filters. It accepts `sort=relevance` when `q` is present. `GET /api/v1/products/suggestions?q=áo` returns at most five product name completions in the standard response envelope. Use `shadow` to compare Elasticsearch product IDs while returning PostgreSQL results; set `elasticsearch` to serve Elasticsearch results with PostgreSQL fallback. Search events are written to the PostgreSQL outbox and consumed asynchronously by `search-indexer`.
 
+Image search is an opt-in internal prototype using CLIP and Elasticsearch kNN. See [setup and evaluation](docs/image-search.md).
+
 ## Cấu trúc
 
 - `cmd/api`: điểm khởi động ứng dụng
@@ -63,3 +65,9 @@ Mọi key Redis của dự án dùng prefix cố định `ecommerce:`, được 
 PostgreSQL là nguồn dữ liệu nghiệp vụ duy nhất. MongoDB chỉ dành cho document linh hoạt như `product_metadata`; `outbox_events` vẫn được giữ trong PostgreSQL và sẽ được consumer riêng chuyển tới ClickHouse khi module analytics được triển khai.
 
 Sơ đồ ERD PostgreSQL được lưu tại [`docs/database.dbml`](docs/database.dbml); có thể mở file này trên dbdiagram.io.
+
+### Product image upload
+
+Configure `IMAGEKIT_URL_ENDPOINT` with the exact HTTPS ImageKit URL endpoint (for example, `https://ik.imagekit.io/your_imagekit_id`). The API validates image URLs against this endpoint and the target product folder. Leave it empty to disable image registration.
+
+Authenticated sellers with `owner`, `manager`, or `staff` membership can register an uploaded image with `POST /api/v1/sellers/{sellerId}/products/{productId}/images` and body `{ "url": "https://.../products/{productId}/{file}" }`. The API verifies product ownership, assigns the next sort order under a product row lock, persists the URL, and returns the created image in the standard response envelope. The backend does not verify that the asset exists in ImageKit; the browser upload URL is not treated as proof of existence.
